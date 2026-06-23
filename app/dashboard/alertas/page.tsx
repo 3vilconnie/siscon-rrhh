@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+// app/dashboard/alertas/page.tsx (Extracto de cómo quedaría el useEffect)
+import { evaluarAlertaContinuidad } from '@/lib/utils/calculoAlertas';
+import { AlertaNotificacion, Trabajador } from '@/types';
 
 interface AlertaContrato {
   rut: number;
@@ -17,113 +20,47 @@ interface AlertaContrato {
 
 export default function ReporteAlertasPage() {
   const searchParams = useSearchParams();
-  const [alertas, setAlertas] = useState<AlertaContrato[]>([]);
+  const [alertas, setAlertas] = useState<AlertaNotificacion[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Capturamos el RUT enfocado desde la barra de direcciones
   const targetRut = searchParams.get('focusRut');
 
-  useEffect(() => {
-    const cargarAlertasYContratos = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('trabajadores')
-        .select(`
-          rut,
-          dv,
-          nombres,
-          primer_apellido,
-          segundo_apellido,
-          contratos(id, fecha_inicio, fecha_termino)
-        `);
-      
-      if (!error && data) {
-        const hoy = new Date();
-        const quinceMesesAtras = new Date();
-        quinceMesesAtras.setMonth(quinceMesesAtras.getMonth() - 15);
+useEffect(() => {
+  const cargarAlertasYContratos = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('trabajadores')
+      .select('rut, dv, nombres, primer_apellido, segundo_apellido, contratos(id, fecha_inicio, fecha_termino)');
+    
+    if (!error && data) {
+      const listadoAlertas: AlertaNotificacion[] = [];
 
-        const listadoAlertas: AlertaContrato[] = [];
+      // app/dashboard/alertas/page.tsx
 
-        data.forEach((t: any) => {
-          if (t.contratos && t.contratos.length >= 2) {
-            const contratosVentana = t.contratos
-              .filter((c: any) => new Date(c.fecha_inicio) >= quinceMesesAtras)
-              .sort((a: any, b: any) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime());
+// Reemplaza tu data.forEach actual por este:
+(data as Trabajador[]).forEach((t) => {
+  const analisis = evaluarAlertaContinuidad(t);
 
-            const tieneContratoActivo = contratosVentana.some((c: any) => {
-              if (!c.fecha_termino) return true;
-              const fTermino = new Date(c.fecha_termino);
-              fTermino.setHours(0, 0, 0, 0);
-              const hoySinHoras = new Date(hoy);
-              hoySinHoras.setHours(0, 0, 0, 0);
-              return fTermino >= hoySinHoras;
-            });
+  if (analisis.califica) {
+    listadoAlertas.push({
+      rut: t.rut,
+      dv: t.dv,
+      nombreCompleto: `${t.primer_apellido} ${t.segundo_apellido || ''} ${t.nombres}`.trim().toUpperCase(),
+      totalContratos: analisis.totalContratos,
+      tiene_vigente: analisis.tieneVigente,
+      fecha_sugerida_retorno: analisis.fechaSugerida
+    });
+  }
+});
 
-            let contratosConsecutivosMax = 0;
-            let rachaActual = 0;
+      setAlertas(listadoAlertas);
+    }
+    setLoading(false);
+  };
 
-            if (contratosVentana.length > 0) {
-              rachaActual = 1;
-              contratosConsecutivosMax = 1;
-
-              for (let i = 1; i < contratosVentana.length; i++) {
-                const contratoPrevio = contratosVentana[i - 1];
-                const contratoActual = contratosVentana[i];
-
-                if (contratoPrevio.fecha_termino) {
-                  const finPrevio = new Date(contratoPrevio.fecha_termino);
-                  const inicioActual = new Date(contratoActual.fecha_inicio);
-                  const diferenciaTiempo = inicioActual.getTime() - finPrevio.getTime();
-                  const diferenciaMeses = diferenciaTiempo / (1000 * 60 * 60 * 24 * 30.44);
-
-                  if (diferenciaMeses < 3) {
-                    rachaActual++;
-                    if (rachaActual > contratosConsecutivosMax) contratosConsecutivosMax = rachaActual;
-                  } else {
-                    rachaActual = 1;
-                  }
-                } else {
-                  rachaActual++;
-                  if (rachaActual > contratosConsecutivosMax) contratosConsecutivosMax = rachaActual;
-                }
-              }
-            }
-
-            if (contratosConsecutivosMax >= 2 && tieneContratoActivo) {
-              const contratosConTermino = contratosVentana.filter((c: any) => c.fecha_termino);
-              let fechaSugerida = 'Revisar ficha';
-
-              if (contratosConTermino.length > 0) {
-                const ultimoTermino = new Date(contratosConTermino[contratosConTermino.length - 1].fecha_termino);
-                ultimoTermino.setMonth(ultimoTermino.getMonth() + 3);
-                fechaSugerida = ultimoTermino.toLocaleDateString('es-CL', {
-                  day: '2-digit', month: '2-digit', year: 'numeric'
-                });
-              }
-
-              listadoAlertas.push({
-                rut: t.rut,
-                dv: t.dv,
-                nombres: t.nombres,
-                primer_apellido: t.primer_apellido,
-                segundo_apellido: t.segundo_apellido,
-                total_contratos: contratosConsecutivosMax,
-                tiene_vigente: true,
-                fecha_sugerida_retorno: fechaSugerida
-              });
-            }
-          }
-        });
-
-        setAlertas(listadoAlertas);
-      } else if (error) {
-        console.error(error.message);
-      }
-      setLoading(false);
-    };
-
-    cargarAlertasYContratos();
-  }, []);
+  cargarAlertasYContratos();
+}, []);
 
   // 3. EFECTO AUTO-FOCUS: Se ejecuta cuando termina de cargar la tabla y se detecta un targetRut
   useEffect(() => {
@@ -191,22 +128,29 @@ export default function ReporteAlertasPage() {
                     return (
                       <tr 
                         key={a.rut} 
-                        id={`fila-alerta-${a.rut}`} // ID dinámico indispensable para el focus
+                        id={`fila-alerta-${a.rut}`} 
                         className={esFilaObjetivo ? 'fila-enfocada' : 'table-warning bg-opacity-10'}
                       >
                         <td className="fw-bold font-monospace">{a.rut}-{a.dv}</td>
+                        
+                        {/* 1. Usamos la nueva propiedad nombreCompleto */}
                         <td className="text-uppercase fw-semibold">
-                          {a.nombres} {a.primer_apellido} {a.segundo_apellido || ''}
+                          {a.nombreCompleto}
                         </td>
+                        
                         <td className="text-center">
-                          <span className="badge bg-warning text-dark fw-bold">{a.total_contratos} contratos</span>
+                          {/* 2. Cambiamos total_contratos por totalContratos */}
+                          <span className="badge bg-warning text-dark fw-bold">{a.totalContratos} contratos</span>
                         </td>
+                        
                         <td className="text-center">
                           <span className="badge bg-success">1 Contrato Vigente</span>
                         </td>
+                        
                         <td className="text-center fw-bold text-secondary">
                           {a.fecha_sugerida_retorno}
                         </td>
+                        
                         <td className="text-end px-3">
                           <Link href={`/dashboard/trabajadores/${a.rut}`} className="btn btn-sm btn-outline-dark py-1">
                             <i className="bi bi-eye me-1"></i> Ver Historial
