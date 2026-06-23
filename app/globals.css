@@ -1,0 +1,35 @@
+/* src/app/globals.css */
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import 'bootstrap-icons/font/bootstrap-icons.css';
+
+/* Ajustes personalizados para el layout de siscon RRHH */
+html, body {
+  height: 100%;
+  margin: 0;
+  background-color: #f8f9fa;
+}
+
+.main-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar-menu {
+  width: 260px;
+  background-color: #212529;
+  flex-shrink: 0;
+}
+
+.content-area {
+  flex-grow: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.sidebar-chat {
+  width: 320px;
+  background-color: #ffffff;
+  border-left: 1px solid #dee2e6;
+  flex-shrink: 0;
+}
