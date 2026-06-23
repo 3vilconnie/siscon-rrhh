@@ -1,22 +1,16 @@
 'use client';
-import { useEffect, useState, useRef } from 'react'; // 👈 Agregamos useRef
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-
-interface AlertaNotificacion {
-  rut: number;
-  nombreCompleto: string;
-  leida: boolean;
-}
+import { Trabajador, AlertaNotificacion } from '@/types';
+import { evaluarAlertaContinuidad } from '@/lib/utils/calculoAlertas';
 
 export default function NavbarSuperior() {
   const router = useRouter();
   const [alertas, setAlertas] = useState<AlertaNotificacion[]>([]);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [loading, setLoading] = useState(true);
-
-  // 1. Creamos la referencia para el contenedor de la campanita
   const contenedorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,74 +19,20 @@ export default function NavbarSuperior() {
       try {
         const { data, error } = await supabase
           .from('trabajadores')
-          .select(`
-            rut,
-            dv,
-            nombres,
-            primer_apellido,
-            segundo_apellido,
-            contratos(id, fecha_inicio, fecha_termino)
-          `);
+          .select('rut, dv, nombres, primer_apellido, segundo_apellido, contratos(id, fecha_inicio, fecha_termino)');
 
         if (!error && data) {
-          const hoy = new Date();
-          const quinceMesesAtras = new Date();
-          quinceMesesAtras.setMonth(quinceMesesAtras.getMonth() - 15);
-
           const listadoCalculado: Omit<AlertaNotificacion, 'leida'>[] = [];
 
-          data.forEach((t: any) => {
-            if (t.contratos && t.contratos.length >= 2) {
-              const contratosVentana = t.contratos
-                .filter((c: any) => new Date(c.fecha_inicio) >= quinceMesesAtras)
-                .sort((a: any, b: any) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime());
+          (data as Trabajador[]).forEach((t) => {
+            const analisis = evaluarAlertaContinuidad(t);
 
-              const tieneContratoActivo = contratosVentana.some((c: any) => {
-                if (!c.fecha_termino) return true;
-                const fTermino = new Date(c.fecha_termino);
-                fTermino.setHours(0, 0, 0, 0);
-                const hoySinHoras = new Date(hoy);
-                hoySinHoras.setHours(0, 0, 0, 0);
-                return fTermino >= hoySinHoras;
+            if (analisis.califica) {
+              listadoCalculado.push({
+                rut: t.rut,
+                nombreCompleto: `${t.primer_apellido} ${t.segundo_apellido || ''} ${t.nombres}`.trim().toUpperCase(),
+                totalContratos: analisis.totalContratos
               });
-
-              let contratosConsecutivosMax = 0;
-              let rachaActual = 0;
-
-              if (contratosVentana.length > 0) {
-                rachaActual = 1;
-                contratosConsecutivosMax = 1;
-
-                for (let i = 1; i < contratosVentana.length; i++) {
-                  const contratoPrevio = contratosVentana[i - 1];
-                  const contratoActual = contratosVentana[i];
-
-                  if (contratoPrevio.fecha_termino) {
-                    const finPrevio = new Date(contratoPrevio.fecha_termino);
-                    const inicioActual = new Date(contratoActual.fecha_inicio);
-                    const diferenciaTiempo = inicioActual.getTime() - finPrevio.getTime();
-                    const diferenciaMeses = diferenciaTiempo / (1000 * 60 * 60 * 24 * 30.44);
-
-                    if (diferenciaMeses < 3) {
-                      rachaActual++;
-                      if (rachaActual > contratosConsecutivosMax) contratosConsecutivosMax = rachaActual;
-                    } else {
-                      rachaActual = 1;
-                    }
-                  } else {
-                    rachaActual++;
-                    if (rachaActual > contratosConsecutivosMax) contratosConsecutivosMax = rachaActual;
-                  }
-                }
-              }
-
-              if (contratosConsecutivosMax >= 2 && tieneContratoActivo) {
-                const constMaterno = t.segundo_apellido ? ` ${t.segundo_apellido}` : '';
-                listadoCalculado.push({
-                  rut: t.rut,
-                  nombreCompleto: `${t.primer_apellido}${constMaterno} ${t.nombres}`.toUpperCase()
-                });
-              }
             }
           });
 
@@ -107,7 +47,7 @@ export default function NavbarSuperior() {
           setAlertas(alertasMapeadas);
         }
       } catch (err) {
-        console.error('Error calculando alertas individuales:', err);
+        console.error('Error calculando alertas:', err);
       } finally {
         setLoading(false);
       }
@@ -116,26 +56,14 @@ export default function NavbarSuperior() {
     consultarAlertasConBrecha();
   }, []);
 
-  // 2. Efecto global para detectar clics externos y cerrar el menú
   useEffect(() => {
     const manejarClicExterno = (evento: MouseEvent) => {
-      // Si el menú está abierto y el clic NO se realizó dentro del contenedorRef, lo cerramos
-      if (
-        menuAbierto &&
-        contenedorRef.current &&
-        !contenedorRef.current.contains(evento.target as Node)
-      ) {
+      if (menuAbierto && contenedorRef.current && !contenedorRef.current.contains(evento.target as Node)) {
         setMenuAbierto(false);
       }
     };
-
-    // Escuchar clics en toda la ventana
     window.addEventListener('mousedown', manejarClicExterno);
-    
-    // Limpieza al desmontar el componente
-    return () => {
-      window.removeEventListener('mousedown', manejarClicExterno);
-    };
+    return () => window.removeEventListener('mousedown', manejarClicExterno);
   }, [menuAbierto]);
 
   const clickAlerta = (rut: number) => {
@@ -149,7 +77,6 @@ export default function NavbarSuperior() {
 
     setAlertas(prev => prev.map(a => a.rut === rut ? { ...a, leida: true } : a));
     setMenuAbierto(false);
-    
     router.push(`/dashboard/alertas?focusRut=${rut}`);
   };
 
@@ -161,7 +88,6 @@ export default function NavbarSuperior() {
         Sistema de Control de Contratos (siscon)
       </div>
 
-      {/* 3. Vinculamos la referencia 'ref={contenedorRef}' al div padre de la campana */}
       <div className="position-relative" ref={contenedorRef}>
         <button 
           className="btn btn-light position-relative rounded-circle p-2"

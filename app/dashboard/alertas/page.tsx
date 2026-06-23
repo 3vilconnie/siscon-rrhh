@@ -26,9 +26,19 @@ export default function ReporteAlertasPage() {
   // Capturamos el RUT enfocado desde la barra de direcciones
   const targetRut = searchParams.get('focusRut');
 
+// Integración ideal dentro del useEffect de app/dashboard/alertas/page.tsx
 useEffect(() => {
   const cargarAlertasYContratos = async () => {
     setLoading(true);
+    
+    // 1. Traer la configuración viva de la base de datos
+    let configSistema = {};
+    const resConfig = await fetch('/api/configuraciones');
+    if (resConfig.ok) {
+      configSistema = await resConfig.json();
+    }
+
+    // 2. Traer los trabajadores
     const { data, error } = await supabase
       .from('trabajadores')
       .select('rut, dv, nombres, primer_apellido, segundo_apellido, contratos(id, fecha_inicio, fecha_termino)');
@@ -36,24 +46,21 @@ useEffect(() => {
     if (!error && data) {
       const listadoAlertas: AlertaNotificacion[] = [];
 
-      // app/dashboard/alertas/page.tsx
+      (data as Trabajador[]).forEach((t) => {
+        // Enviar la configuración dinámica al motor! ⚡
+        const analisis = evaluarAlertaContinuidad(t, configSistema);
 
-// Reemplaza tu data.forEach actual por este:
-(data as Trabajador[]).forEach((t) => {
-  const analisis = evaluarAlertaContinuidad(t);
-
-  if (analisis.califica) {
-    listadoAlertas.push({
-      rut: t.rut,
-      dv: t.dv,
-      nombreCompleto: `${t.primer_apellido} ${t.segundo_apellido || ''} ${t.nombres}`.trim().toUpperCase(),
-      totalContratos: analisis.totalContratos,
-      tiene_vigente: analisis.tieneVigente,
-      fecha_sugerida_retorno: analisis.fechaSugerida
-    });
-  }
-});
-
+        if (analisis.califica) {
+          listadoAlertas.push({
+            rut: t.rut,
+            dv: t.dv,
+            nombreCompleto: `${t.primer_apellido} ${t.segundo_apellido || ''} ${t.nombres}`.trim().toUpperCase(),
+            totalContratos: analisis.totalContratos,
+            tiene_vigente: analisis.tieneVigente,
+            fecha_sugerida_retorno: analisis.fechaSugerida
+          });
+        }
+      });
       setAlertas(listadoAlertas);
     }
     setLoading(false);

@@ -2,12 +2,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-
-interface AlertaNotificacion {
-  rut: number;
-  nombreCompleto: string;
-  totalContratos: number;
-}
+import { Trabajador, AlertaNotificacion } from '@/types';
+import { evaluarAlertaContinuidad } from '@/lib/utils/calculoAlertas';
 
 export default function AlertasPanel() {
   const [alertas, setAlertas] = useState<AlertaNotificacion[]>([]);
@@ -17,91 +13,24 @@ export default function AlertasPanel() {
   useEffect(() => {
     const calcularNotificacionesCampana = async () => {
       try {
-        // 1. Solicitamos los trabajadores con sus contratos en tiempo real
         const { data, error } = await supabase
           .from('trabajadores')
-          .select(`
-            rut,
-            nombres,
-            primer_apellido,
-            segundo_apellido,
-            contratos(id, fecha_inicio, fecha_termino)
-          `);
+          .select('rut, nombres, primer_apellido, segundo_apellido, contratos(id, fecha_inicio, fecha_termino)');
 
         if (error) throw error;
 
         if (data) {
-          const hoy = new Date();
-          const quinceMesesAtras = new Date();
-          quinceMesesAtras.setMonth(quinceMesesAtras.getMonth() - 15);
-
           const listadoNotificaciones: AlertaNotificacion[] = [];
 
-          // 2. Filtro inteligente de brechas consecutivas (Elimina alertas falsas como la de Abraham)
-          data.forEach((t: any) => {
-            if (t.contratos && t.contratos.length >= 2) {
-              
-              // Filtrar el marco de 15 meses y ordenar cronológicamente
-              const contratosVentana = t.contratos
-                .filter((c: any) => new Date(c.fecha_inicio) >= quinceMesesAtras)
-                .sort((a: any, b: any) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime());
+          (data as Trabajador[]).forEach((t) => {
+            const analisis = evaluarAlertaContinuidad(t);
 
-              // Validar si el trabajador posee alguna relación laboral vigente hoy
-              const tieneContratoActivo = contratosVentana.some((c: any) => {
-                if (!c.fecha_termino) return true;
-                const fTermino = new Date(c.fecha_termino);
-                fTermino.setHours(0, 0, 0, 0);
-                const hoySinHoras = new Date(hoy);
-                hoySinHoras.setHours(0, 0, 0, 0);
-                return fTermino >= hoySinHoras;
+            if (analisis.califica) {
+              listadoNotificaciones.push({
+                rut: t.rut,
+                nombreCompleto: `${t.primer_apellido} ${t.segundo_apellido || ''} ${t.nombres}`.trim().toUpperCase(),
+                totalContratos: analisis.totalContratos
               });
-
-              // Medir la brecha temporal entre los contratos sucesivos
-              let contratosConsecutivosMax = 0;
-              let rachaActual = 0;
-
-              if (contratosVentana.length > 0) {
-                rachaActual = 1;
-                contratosConsecutivosMax = 1;
-
-                for (let i = 1; i < contratosVentana.length; i++) {
-                  const contratoPrevio = contratosVentana[i - 1];
-                  const contratoActual = contratosVentana[i];
-
-                  if (contratoPrevio.fecha_termino) {
-                    const finPrevio = new Date(contratoPrevio.fecha_termino);
-                    const inicioActual = new Date(contratoActual.fecha_inicio);
-
-                    // Calculamos la distancia real en meses entre contratos
-                    const diferenciaTiempo = inicioActual.getTime() - finPrevio.getTime();
-                    const diferenciaMeses = diferenciaTiempo / (1000 * 60 * 60 * 24 * 30.44);
-
-                    if (diferenciaMeses < 3) {
-                      rachaActual++;
-                      if (rachaActual > contratosConsecutivosMax) {
-                        contratosConsecutivosMax = rachaActual;
-                      }
-                    } else {
-                      rachaActual = 1; // Respetó los 3 meses fuera, se reinicia la racha de consecutivos
-                    }
-                  } else {
-                    rachaActual++;
-                    if (rachaActual > contratosConsecutivosMax) {
-                      contratosConsecutivosMax = rachaActual;
-                    }
-                  }
-                }
-              }
-
-              // Si tiene racha de 2 o más contratos consecutivos Y está vigente, califica para la alerta
-              if (contratosConsecutivosMax >= 2 && tieneContratoActivo) {
-                const materno = t.segundo_apellido ? ` ${t.segundo_apellido}` : '';
-                listadoNotificaciones.push({
-                  rut: t.rut,
-                  nombreCompleto: `${t.primer_apellido}${materno} ${t.nombres}`.toUpperCase(),
-                  totalContratos: contratosConsecutivosMax
-                });
-              }
             }
           });
 
@@ -119,7 +48,6 @@ export default function AlertasPanel() {
 
   return (
     <div className="position-relative">
-      {/* BOTÓN DE LA CAMPANITA CON EL IDENTIFICADOR VISUAL */}
       <button 
         className="btn btn-link text-dark p-1 position-relative border-0" 
         style={{ textDecoration: 'none', outline: 'none' }}
@@ -136,7 +64,6 @@ export default function AlertasPanel() {
         )}
       </button>
 
-      {/* DETALLE DESPLEGABLE DE NOTIFICACIONES */}
       {menuAbierto && (
         <div 
           className="position-absolute dropdown-menu dropdown-menu-end show shadow-lg border p-0 bg-white rounded" 
@@ -188,7 +115,6 @@ export default function AlertasPanel() {
             <Link 
               href="/dashboard/alertas" 
               className="d-block w-100 py-2 text-secondary fw-semibold small text-decoration-none bg-light"
-              style={{ transition: 'background 0.2s' }}
               onClick={() => setMenuAbierto(false)}
             >
               Ver Panel de Advertencias Completo

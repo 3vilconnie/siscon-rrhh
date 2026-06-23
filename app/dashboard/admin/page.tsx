@@ -1,266 +1,323 @@
+// app/dashboard/admin/page.tsx
 'use client';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase'; // Asegúrate de importar tu cliente estándar de supabase
-import { useRouter } from 'next/navigation';
 
-interface UsuarioAdmin {
+import { useEffect, useState } from 'react';
+import { evaluarAlertaContinuidad } from '@/lib/utils/calculoAlertas';
+import { Trabajador } from '@/types';
+
+interface Usuario {
   id: string;
   email: string;
-  rol: string;
-  ultimaConexion: string;
+  user_metadata: { role?: string };
+  banned_until?: string | null;
+  created_at: string;
 }
 
-export default function ModuloAdministradorPage() {
-  const router = useRouter();
-  const [usuarios, setUsuarios] = useState<UsuarioAdmin[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [autorizado, setAutorizado] = useState(false); // Estado para validar el acceso
-  
-  // Estados para el formulario de creación
-  const [nuevoEmail, setNuevoEmail] = useState('');
-  const [nuevoPassword, setNuevoPassword] = useState('');
-  const [nuevoRol, setNuevoRol] = useState('usuario');
+interface ParametrosSistema {
+  ventana_meses: number;
+  enfriamiento_meses: number;
+  minimo_contratos: number;
+}
 
-  // Mensajes de feedback
-  const [statusMsg, setStatusMsg] = useState({ tipo: '', texto: '' });
+interface LogAuditoria {
+  id: string;
+  actor: string;
+  accion: string;
+  detalles: string;
+  creado_en: string;
+}
+
+export default function ConsolaAdministradorCompleta() {
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [logs, setLogs] = useState<LogAuditoria[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [exportando, setExportando] = useState(false);
+
+  const [parametros, setParametros] = useState<ParametrosSistema>({
+    ventana_meses: 15, enfriamiento_meses: 3, minimo_contratos: 2
+  });
+  const [guardandoParametros, setGuardandoParametros] = useState(false);
+
+  const cargarDatosConsola = async () => {
+    setLoading(true);
+    try {
+      const resUsers = await fetch('/api/admin/usuarios');
+      if (resUsers.ok) setUsuarios(await resUsers.json());
+
+      const resConfig = await fetch('/api/configuraciones');
+      if (resConfig.ok) {
+        const dataConfig = await resConfig.json();
+        if (dataConfig.ventana_meses) setParametros(dataConfig);
+      }
+
+      const resLogs = await fetch('/api/admin/auditoria');
+      if (resLogs.ok) setLogs(await resLogs.json());
+
+    } catch (error) {
+      console.error('Error al inicializar consola:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const verificarPermisosYContratos = async () => {
-      setLoading(true);
-      try {
-        // 1. Obtener el usuario autenticado actualmente
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+    cargarDatosConsola();
+  }, []);
 
-        if (authError || !user) {
-          router.push('/login'); // Si no hay sesión, al login
-          return;
-        }
-
-        // 2. Evaluar el rol guardado en los metadatos
-        const rolUsuario = user.user_metadata?.role;
-
-        if (rolUsuario !== 'admin') {
-          // ❌ NO ES ADMIN: Lo sacamos expulsado a la nómina general
-          alert('🚫 Acceso denegado: No posee privilegios de Administrador para ver esta sección.');
-          router.push('/dashboard/trabajadores');
-          return;
-        }
-
-        // ✅ ES ADMIN: Permitimos renderizar la vista y cargamos la tabla
-        setAutorizado(true);
-        await cargarUsuarios();
-      } catch (err) {
-        console.error('Error de autenticación:', err);
-        router.push('/dashboard/trabajadores');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    verificarPermisosYContratos();
-  }, [router]);
-
-  const cargarUsuarios = async () => {
-    try {
-      const res = await fetch('/api/admin/usuarios');
-      const data = await res.json();
-      if (data.usuarios) setUsuarios(data.usuarios);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleCrearUsuario = async (e: React.FormEvent) => {
+  const handleGuardarParametros = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nuevoEmail || !nuevoPassword) return;
-
+    setGuardandoParametros(true);
     try {
-      const res = await fetch('/api/admin/usuarios', {
+      const res = await fetch('/api/configuraciones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accion: 'CREAR',
-          email: nuevoEmail,
-          password: nuevoPassword,
-          nuevoRol: nuevoRol
-        })
+        body: JSON.stringify(parametros)
       });
-      const data = await res.json();
-      if (data.error) {
-        setStatusMsg({ tipo: 'danger', texto: `Error: ${data.error}` });
-      } else {
-        setStatusMsg({ tipo: 'success', texto: '¡Usuario creado con éxito en el sistema Auth!' });
-        setNuevoEmail('');
-        setNuevoPassword('');
-        cargarUsuarios();
-      }
-    } catch (err) {
-      setStatusMsg({ tipo: 'danger', texto: 'Error de conexión con la API Admin' });
+      if (res.ok) alert('¡Parámetros actualizados! ⚙️✨');
+    } finally {
+      setGuardandoParametros(false);
     }
   };
 
-  const cambiarRol = async (userId: string, rolActual: string) => {
-    const elSiguienteRol = rolActual === 'admin' ? 'usuario' : 'admin';
-    if (!confirm(`¿Desea cambiar los privilegios del usuario a [${elSiguienteRol.toUpperCase()}]?`)) return;
-
+  const suspenderUsuario = async (id: string, estaSuspendido: boolean) => {
+    const accionTexto = estaSuspendido ? 'ACTIVAR' : 'SUSPENDER';
+    if (!window.confirm(`¿Deseas ${accionTexto} el acceso de este operador?`)) return;
     try {
       const res = await fetch('/api/admin/usuarios', {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accion: 'MODIFICAR_ROL', userId, nuevoRol: elSiguienteRol })
+        body: JSON.stringify({ id, accion: estaSuspendido ? 'activar' : 'suspender' })
       });
-      const data = await res.json();
-      if (!data.error) {
-        setStatusMsg({ tipo: 'success', texto: 'Privilegios actualizados correctamente.' });
-        cargarUsuarios();
-      }
-    } catch (err) {
-      console.error(err);
+      if (res.ok) cargarDatosConsola();
+    } catch (error) { console.error(error); }
+  };
+
+  const eliminarUsuario = async (id: string) => {
+    if (!window.confirm('🚨 ¡ALERTA CRÍTICA! ¿Eliminar este usuario definitivamente?')) return;
+    try {
+      const res = await fetch('/api/admin/usuarios', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      if (res.ok) cargarDatosConsola();
+    } catch (error) { console.error(error); }
+  };
+
+  // --- LÓGICA DE EXPORTACIÓN ---
+  const generarArchivoCSV = (columnas: string[], filas: any[][], nombreArchivo: string) => {
+    const separador = ';'; // Compatible con Excel en español
+    const contenido = [
+      columnas.join(separador),
+      ...filas.map(fila => fila.map(celda => `"${String(celda).replace(/"/g, '""')}"`).join(separador))
+    ].join('\n');
+
+    // El \ufeff (BOM) asegura que Excel lea correctamente los acentos (UTF-8)
+    const blob = new Blob(['\ufeff' + contenido], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${nombreArchivo}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportarNomina = async () => {
+    setExportando(true);
+    try {
+      const res = await fetch('/api/admin/exportar');
+      if (!res.ok) throw new Error('Error al extraer datos');
+      const data: Trabajador[] = await res.json();
+
+      const columnas = ['RUT', 'DV', 'Nombres', 'Apellido Paterno', 'Apellido Materno', 'Total Contratos'];
+      const filas = data.map(t => [
+        t.rut,
+        t.dv,
+        t.nombres,
+        t.primer_apellido,
+        t.segundo_apellido || '',
+        t.contratos?.length || 0
+      ]);
+
+      generarArchivoCSV(columnas, filas, `Reporte_Nomina_Completa_${new Date().toISOString().split('T')[0]}`);
+    } catch (error) {
+      alert('Hubo un error al exportar la nómina.');
+    } finally {
+      setExportando(false);
     }
   };
 
-  const restablecerPassword = async (userId: string, email: string) => {
-    const passNueva = prompt(`Ingrese la nueva contraseña provisoria para ${email}:`);
-    if (!passNueva || passNueva.trim().length < 6) {
-      if (passNueva) alert('La contraseña debe tener mínimo 6 caracteres.');
-      return;
-    }
-
+  const handleExportarAlertas = async () => {
+    setExportando(true);
     try {
-      const res = await fetch('/api/admin/usuarios', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accion: 'RESETEAR_PASSWORD', userId, password: passNueva })
+      const res = await fetch('/api/admin/exportar');
+      if (!res.ok) throw new Error('Error al extraer datos');
+      const data: Trabajador[] = await res.json();
+
+      const columnas = ['RUT', 'DV', 'Nombre Completo', 'Contratos Consecutivos', 'Tiene Vigente', 'Fecha Sugerida Retorno'];
+      const filas: any[][] = [];
+
+      data.forEach(t => {
+        // Utilizamos nuestra función centralizada con los parámetros actuales
+        const analisis = evaluarAlertaContinuidad(t, parametros);
+        if (analisis.califica) {
+          filas.push([
+            t.rut,
+            t.dv,
+            `${t.primer_apellido} ${t.segundo_apellido || ''} ${t.nombres}`.trim().toUpperCase(),
+            analisis.totalContratos,
+            analisis.tieneVigente ? 'SÍ' : 'NO',
+            analisis.fechaSugerida
+          ]);
+        }
       });
-      const data = await res.json();
-      if (!data.error) {
-        alert(`🔑 Contraseña de ${email} cambiada exitosamente a: ${passNueva}`);
-      } else {
-        alert(`Error: ${data.error}`);
+
+      if (filas.length === 0) {
+        alert('No hay trabajadores en zona de alerta en este momento.');
+        return;
       }
-    } catch (err) {
-      console.error(err);
+
+      generarArchivoCSV(columnas, filas, `Reporte_Alertas_Legales_${new Date().toISOString().split('T')[0]}`);
+    } catch (error) {
+      alert('Hubo un error al exportar las alertas.');
+    } finally {
+      setExportando(false);
     }
   };
-
-  // Mientras valida los roles, mostramos pantalla de carga preventiva para evitar parpadeos
-  if (loading || !autorizado) {
-    return <div className="p-4 text-muted">Verificando credenciales de seguridad administrativa...</div>;
-  }
 
   return (
     <div className="container-fluid">
-      <div className="mb-4">
-        <h2 className="fw-bold text-dark m-0">⚙️ Consola de Administración</h2>
-        <p className="text-muted small">Gestión centralizada de credenciales, roles y accesos institucionales.</p>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 className="fw-bold text-dark m-0">⚙️ Consola de Administración</h2>
+          <p className="text-muted small m-0">Administración de credenciales, parámetros, auditoría y reportes.</p>
+        </div>
+        <button className="btn btn-outline-dark fw-bold small" onClick={cargarDatosConsola} disabled={loading}>
+          <i className="bi bi-arrow-clockwise me-1"></i> Sincronizar
+        </button>
       </div>
 
-      {statusMsg.texto && (
-        <div className={`alert alert-${statusMsg.tipo} alert-dismissible fade show small`} role="alert">
-          {statusMsg.texto}
-          <button type="button" className="btn-close" onClick={() => setStatusMsg({ tipo: '', texto: '' })}></button>
-        </div>
-      )}
-
       <div className="row g-4">
-        {/* FORMULARIO DE CREACIÓN */}
-        <div className="col-12 col-md-4">
-          <div className="card shadow-sm border-0 bg-white p-3">
-            <h5 className="fw-bold text-secondary mb-3">Registrar Nuevo Operador</h5>
-            <form onSubmit={handleCrearUsuario} className="d-flex flex-column gap-3">
+        {/* COLUMNA IZQUIERDA: Parámetros y Exportaciones */}
+        <div className="col-12 col-lg-4 d-flex flex-column gap-4">
+          
+          {/* PARÁMETROS */}
+          <div className="card shadow-sm border-0 bg-white p-4">
+            <h5 className="fw-bold text-secondary border-bottom pb-2 mb-3">Parámetros de Alerta</h5>
+            <form onSubmit={handleGuardarParametros} className="d-flex flex-column gap-3">
               <div>
-                <label className="form-label small text-muted fw-bold mb-1">Correo Electrónico</label>
-                <input 
-                  type="email" 
-                  className="form-control form-control-sm" 
-                  placeholder="ejemplo@conaf.cl"
-                  value={nuevoEmail} 
-                  onChange={(e) => setNuevoEmail(e.target.value)}
-                  required 
-                />
+                <label className="form-label small fw-bold">Ventana de Evaluación (Meses)</label>
+                <input type="number" className="form-control" value={parametros.ventana_meses} onChange={(e) => setParametros({ ...parametros, ventana_meses: Number(e.target.value) })} min={1} required />
               </div>
               <div>
-                <label className="form-label small text-muted fw-bold mb-1">Contraseña Inicial</label>
-                <input 
-                  type="password" 
-                  className="form-control form-control-sm" 
-                  placeholder="Mínimo 6 caracteres"
-                  value={nuevoPassword} 
-                  onChange={(e) => setNuevoPassword(e.target.value)}
-                  required 
-                />
+                <label className="form-label small fw-bold">Enfriamiento (Meses)</label>
+                <input type="number" className="form-control" value={parametros.enfriamiento_meses} onChange={(e) => setParametros({ ...parametros, enfriamiento_meses: Number(e.target.value) })} min={1} required />
               </div>
-              <div>
-                <label className="form-label small text-muted fw-bold mb-1">Asignar Rol Inicial</label>
-                <select 
-                  className="form-select form-select-sm"
-                  value={nuevoRol} 
-                  onChange={(e) => setNuevoRol(e.target.value)}
-                >
-                  <option value="usuario">Usuario Estándar (Consultas)</option>
-                  <option value="admin">Administrador (Control Total)</option>
-                </select>
-              </div>
-              <button type="submit" className="btn btn-sm btn-dark fw-bold mt-2 py-2">
-                <i className="bi bi-person-plus-fill me-1"></i> Crear Cuenta Activa
+              <button type="submit" className="btn btn-warning fw-bold mt-2" disabled={guardandoParametros}>
+                {guardandoParametros ? 'Guardando...' : 'Actualizar Reglas'}
               </button>
             </form>
           </div>
+
+          {/* EXPORTACIONES */}
+          <div className="card shadow-sm border-0 bg-white p-4">
+            <h5 className="fw-bold text-secondary border-bottom pb-2 mb-3">
+              <i className="bi bi-file-earmark-excel me-2 text-success"></i>Exportación de Datos
+            </h5>
+            <p className="text-muted small mb-3">Descarga la información en formato CSV compatible con Microsoft Excel.</p>
+            <div className="d-flex flex-column gap-2">
+              <button 
+                className="btn btn-outline-success text-start fw-semibold" 
+                onClick={handleExportarNomina}
+                disabled={exportando}
+              >
+                <i className="bi bi-people me-2"></i>Descargar Nómina Completa
+              </button>
+              <button 
+                className="btn btn-outline-danger text-start fw-semibold" 
+                onClick={handleExportarAlertas}
+                disabled={exportando}
+              >
+                <i className="bi bi-exclamation-triangle me-2"></i>Reporte Legal de Alertas
+              </button>
+            </div>
+          </div>
+
         </div>
 
-        {/* TABLA DE USUARIOS */}
-        <div className="col-12 col-md-8">
+        {/* COLUMNA DERECHA: Operadores y Auditoría */}
+        <div className="col-12 col-lg-8 d-flex flex-column gap-4">
+          
+          {/* OPERADORES */}
           <div className="card shadow-sm border-0 bg-white overflow-hidden">
             <div className="card-header bg-dark text-white fw-bold small py-3">
-              Cuentas de Usuarios Registradas
+              <i className="bi bi-shield-lock me-2"></i>Operadores Institucionales
             </div>
             <div className="table-responsive">
               <table className="table table-hover align-middle m-0 small">
-                <thead className="table-light text-uppercase" style={{ fontSize: '11px' }}>
+                <thead className="table-light text-uppercase">
                   <tr>
-                    <th className="px-3">Email Institucional</th>
-                    <th>Privilegio / Rol</th>
-                    <th>Última Actividad</th>
-                    <th className="text-end px-3">Gestión de Cuenta</th>
+                    <th className="px-3">Email</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th className="text-end px-3">Gestión</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {usuarios.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="text-center py-4 text-muted">No hay otros usuarios registrados</td>
-                    </tr>
+                  {loading ? (
+                    <tr><td colSpan={4} className="text-center py-4">Cargando...</td></tr>
                   ) : (
-                    usuarios.map((u) => (
-                      <tr key={u.id}>
-                        <td className="px-3 fw-semibold text-dark">{u.email}</td>
-                        <td>
-                          <button 
-                            onClick={() => cambiarRol(u.id, u.rol)}
-                            className={`badge border-0 p-2 text-white ${u.rol === 'admin' ? 'bg-danger' : 'bg-secondary'}`}
-                            title="Haga clic para alternar el rol"
-                            style={{ cursor: 'pointer' }}
-                          >
-                            <i className="bi bi-shield-lock-fill me-1"></i>
-                            {u.rol.toUpperCase()}
-                          </button>
-                        </td>
-                        <td className="text-muted">{u.ultimaConexion}</td>
-                        <td className="text-end px-3">
-                          <button 
-                            onClick={() => restablecerPassword(u.id, u.email)}
-                            className="btn btn-xs btn-outline-warning py-1 px-2 fw-semibold"
-                            style={{ fontSize: '11px' }}
-                          >
-                            <i className="bi bi-key-fill me-1"></i> Reset Pass
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    usuarios.map((u) => {
+                      const suspendido = !!u.banned_until;
+                      return (
+                        <tr key={u.id} className={suspendido ? 'table-danger bg-opacity-25' : ''}>
+                          <td className="px-3 fw-semibold">{u.email}</td>
+                          <td><span className={`badge ${u.user_metadata?.role === 'admin' ? 'bg-danger' : 'bg-secondary'}`}>{u.user_metadata?.role || 'USER'}</span></td>
+                          <td>{suspendido ? <span className="badge bg-danger">Suspendido</span> : <span className="badge bg-success">Activo</span>}</td>
+                          <td className="text-end px-3">
+                            <button onClick={() => suspenderUsuario(u.id, suspendido)} className={`btn btn-sm py-1 px-2 me-2 fw-bold ${suspendido ? 'btn-success' : 'btn-outline-warning'}`}>
+                              <i className={`bi ${suspendido ? 'bi-play-fill' : 'bi-pause-fill'}`}></i>
+                            </button>
+                            <button onClick={() => eliminarUsuario(u.id)} className="btn btn-sm btn-outline-danger py-1 px-2">
+                              <i className="bi bi-trash-fill"></i>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
           </div>
+
+          {/* AUDITORÍA */}
+          <div className="card shadow-sm border-0 bg-white">
+            <div className="card-header bg-secondary text-white fw-bold small">
+              <i className="bi bi-journal-text me-2"></i>Historial de Auditoría
+            </div>
+            <div className="card-body p-0 overflow-auto" style={{ maxHeight: '350px' }}>
+              <div className="list-group list-group-flush small font-monospace">
+                {logs.length === 0 ? (
+                  <div className="p-3 text-muted text-center">No hay registros aún.</div>
+                ) : (
+                  logs.map(log => (
+                    <div key={log.id} className="list-group-item p-2 border-bottom">
+                      <div className="d-flex justify-content-between mb-1">
+                        <strong className="text-primary">{log.accion}</strong>
+                        <span className="text-muted" style={{ fontSize: '10px' }}>
+                          {new Date(log.creado_en).toLocaleString('es-CL')}
+                        </span>
+                      </div>
+                      <div className="text-muted" style={{ fontSize: '11px' }}>{log.detalles}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

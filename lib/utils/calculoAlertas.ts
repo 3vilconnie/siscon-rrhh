@@ -1,20 +1,35 @@
 // lib/utils/calculoAlertas.ts
 import { Trabajador } from '@/types';
 
-export function evaluarAlertaContinuidad(trabajador: Trabajador, fechaReferencia: Date = new Date()) {
-  if (!trabajador.contratos || trabajador.contratos.length < 2) {
+export interface ConfigAlertas {
+  ventana_meses?: number;
+  enfriamiento_meses?: number;
+  minimo_contratos?: number;
+}
+
+export function evaluarAlertaContinuidad(
+  trabajador: Trabajador, 
+  config: ConfigAlertas = {}, 
+  fechaReferencia: Date = new Date()
+) {
+  // Asignación dinámica: Usa lo que viene de la BD o los valores tradicionales por defecto
+  const ventana = config.ventana_meses ?? 15;
+  const enfriamiento = config.enfriamiento_meses ?? 3;
+  const minContratos = config.minimo_contratos ?? 2;
+
+  if (!trabajador.contratos || trabajador.contratos.length < minContratos) {
     return { califica: false, totalContratos: 0 };
   }
 
-  const quinceMesesAtras = new Date(fechaReferencia);
-  quinceMesesAtras.setMonth(quinceMesesAtras.getMonth() - 15);
+  const limiteTiempoAtras = new Date(fechaReferencia);
+  limiteTiempoAtras.setMonth(limiteTiempoAtras.getMonth() - ventana);
 
-  // 1. Filtrar el marco de 15 meses y ordenar
+  // 1. Filtrar contratos dentro de la ventana dinámica
   const contratosVentana = trabajador.contratos
-    .filter(c => new Date(c.fecha_inicio) >= quinceMesesAtras)
+    .filter(c => new Date(c.fecha_inicio) >= limiteTiempoAtras)
     .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime());
 
-  // 2. Validar si tiene contrato vigente
+  // 2. Validar vigencia laboral
   const tieneContratoActivo = contratosVentana.some(c => {
     if (!c.fecha_termino) return true;
     const fTermino = new Date(c.fecha_termino);
@@ -24,7 +39,7 @@ export function evaluarAlertaContinuidad(trabajador: Trabajador, fechaReferencia
     return fTermino >= hoySinHoras;
   });
 
-  // 3. Medir la brecha temporal (< 3 meses)
+  // 3. Evaluar brechas con el parámetro dinámico de enfriamiento
   let contratosConsecutivosMax = 0;
   let rachaActual = 0;
 
@@ -41,7 +56,7 @@ export function evaluarAlertaContinuidad(trabajador: Trabajador, fechaReferencia
         const inicioActual = new Date(contratoActual.fecha_inicio);
         const diferenciaMeses = (inicioActual.getTime() - finPrevio.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
 
-        if (diferenciaMeses < 3) {
+        if (diferenciaMeses < enfriamiento) {
           rachaActual++;
           if (rachaActual > contratosConsecutivosMax) contratosConsecutivosMax = rachaActual;
         } else {
@@ -54,13 +69,13 @@ export function evaluarAlertaContinuidad(trabajador: Trabajador, fechaReferencia
     }
   }
 
-  // 4. Calcular fecha sugerida de retorno (si califica)
+  // 4. Calcular fecha sugerida basada en los nuevos parámetros
   let fechaSugerida = 'Revisar ficha';
-  if (contratosConsecutivosMax >= 2 && tieneContratoActivo) {
+  if (contratosConsecutivosMax >= minContratos && tieneContratoActivo) {
     const contratosConTermino = contratosVentana.filter(c => c.fecha_termino);
     if (contratosConTermino.length > 0) {
       const ultimoTermino = new Date(contratosConTermino[contratosConTermino.length - 1].fecha_termino!);
-      ultimoTermino.setMonth(ultimoTermino.getMonth() + 3);
+      ultimoTermino.setMonth(ultimoTermino.getMonth() + enfriamiento);
       fechaSugerida = ultimoTermino.toLocaleDateString('es-CL', {
         day: '2-digit', month: '2-digit', year: 'numeric'
       });
@@ -68,7 +83,7 @@ export function evaluarAlertaContinuidad(trabajador: Trabajador, fechaReferencia
   }
 
   return {
-    califica: contratosConsecutivosMax >= 2 && tieneContratoActivo,
+    califica: contratosConsecutivosMax >= minContratos && tieneContratoActivo,
     totalContratos: contratosConsecutivosMax,
     fechaSugerida,
     tieneVigente: tieneContratoActivo

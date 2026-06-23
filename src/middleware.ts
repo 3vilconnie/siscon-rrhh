@@ -1,73 +1,80 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+// src/middleware.ts
+import { createServerClient } from '@supabase/ssr';
+import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  const url = request.nextUrl.clone();
-  
-  // 1. Capturar las cookies de autenticación de Supabase
-  const cookieStore = request.cookies;
-  const authCookie = cookieStore.getAll().find(c => c.name.includes('auth-token') || c.name.includes('access-token'));
-  let token = authCookie ? authCookie.value : null;
+  // 1. Creamos una respuesta inicial
+  let supabaseResponse = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
 
-  // 2. Si un usuario sin cookie intenta entrar a cualquier ruta del dashboard, REBOTE INMEDIATO
-  if (!token) {
-    url.pathname = '/login';
-    url.searchParams.set('error', 'sesion-expirada');
-    return NextResponse.redirect(url);
+  // 2. Inicializamos el cliente SSR de Supabase para leer/escribir cookies de forma segura
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          // Actualizamos la petición actual
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          
+          // Actualizamos la respuesta que se le enviará al navegador
+          supabaseResponse = NextResponse.next({
+            request,
+          });
+          
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  // 3. Obtenemos el usuario de forma segura llamando a la API de Supabase
+  // Esto no solo lee la cookie, sino que verifica que sea válida en el servidor
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // 4. Definimos las rutas a proteger
+  const isAuthRoute = request.nextUrl.pathname.startsWith('/login');
+  const isDashboardRoute = request.nextUrl.pathname.startsWith('/dashboard');
+  const isApiAdminRoute = request.nextUrl.pathname.startsWith('/api/admin');
+
+  // --- REGLAS DE PROTECCIÓN ---
+
+  // Si intenta ir al dashboard sin estar logueado, lo mandamos al login
+  if (isDashboardRoute && !user) {
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  try {
-    // Limpiamos el token si viene envuelto en formato de arreglo por Supabase SSR
-    if (token.startsWith('%5B%22')) {
-      const decoded = decodeURIComponent(token);
-      const parsed = JSON.parse(decoded);
-      token = parsed[0];
-    }
-
-    // 3. Inicializamos un cliente rápido para verificar la identidad real del token con Supabase
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-    );
-
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-
-    // Si el token es inválido, viejo o fue manipulado: REBOTE
-    if (error || !user) {
-      url.pathname = '/login';
-      return NextResponse.redirect(url);
-    }
-
-    // 4. BLOQUEO ESTRICTO DE ADMINISTRADOR:
-    // Si intenta entrar a /dashboard/admin, verificamos obligatoriamente sus metadatos
-    if (url.pathname.startsWith('/dashboard/admin')) {
-      const rolUsuario = user.user_metadata?.role;
-      if (rolUsuario !== 'admin') {
-        // Si no es admin, lo expulsamos a la nómina normal con una alerta en los parámetros
-        url.pathname = '/dashboard/trabajadores';
-        url.searchParams.set('alerta', 'no-autorizado');
-        return NextResponse.redirect(url);
-      }
-    }
-
-  } catch (err) {
-    console.error('Error crítico en el middleware de seguridad:', err);
-    url.pathname = '/login';
-    return NextResponse.redirect(url);
+  // Si intenta ir al login pero ya está logueado, lo mandamos al dashboard
+  if (isAuthRoute && user) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // Si pasa todas las validaciones, se le permite continuar a la página
-  return NextResponse.next();
+  // (Opcional pero recomendado) Proteger las rutas de API de administración en el Middleware
+  if (isApiAdminRoute && !user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
+  return supabaseResponse;
 }
 
-// 5. CONFIGURACIÓN DEL FILTRO (Matcher):
-// Aquí le decimos al Middleware qué rutas exactas debe proteger obligatoriamente.
-// ... Todo tu código superior del middleware se mantiene exactamente igual
-
+// Configuramos en qué rutas debe ejecutarse este middleware
 export const config = {
   matcher: [
-    '/dashboard',       // 👈 Protege la raíz exacta (Evita la entrada a intrusos como "Invitado")
-    '/dashboard/:path*' // Protege todo el árbol de carpetas internas de la nómina
+    /*
+     * Aplica a todas las rutas excepto:
+     * - _next/static (archivos estáticos de Next.js)
+     * - _next/image (optimización de imágenes)
+     * - favicon.ico (ícono del sitio)
+     * - archivos con extensiones públicas (svg, png, jpg, etc.)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

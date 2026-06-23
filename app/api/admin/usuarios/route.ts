@@ -1,126 +1,106 @@
+// app/api/admin/usuarios/route.ts
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers'; // 👈 Importamos el helper nativo de Next.js
 
-// Inicializamos el cliente administrador con la clave secreta Service Role
+// Inicializamos el cliente de Supabase con permisos de Service Role (Admin)
+// NUNCA expongas la SUPABASE_SERVICE_ROLE_KEY en el cliente
 const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || '', //
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Función de validación adaptada para evitar bloqueos en localhost
-async function comprobarPermisosAdmin(req: Request) {
+// OBTENER LISTA DE USUARIOS
+export async function GET() {
   try {
-    // 🛡️ BYPASS DE SEGURIDAD PARA DESARROLLO LOCAL:
-    // Si estás en localhost, permitimos el paso para evitar que las cookies encriptadas rompan la grilla
-    const url = new URL(req.url);
-    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-      return true; 
-    }
-
-    // --- CÓDIGO DE VALIDACIÓN ESTRICTA PARA PRODUCCIÓN ---
-    const cookieStore = await cookies();
+    const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
     
-    // Intentamos buscar cualquier cookie que contenga el token de autenticación de Supabase
-    const todasLasCookies = cookieStore.getAll();
-    const cookieAuth = todasLasCookies.find(c => c.name.includes('auth-token') || c.name.includes('access-token'));
-    let token = cookieAuth ? cookieAuth.value : null;
-
-    if (token) {
-      if (token.startsWith('%5B%22')) {
-        const decoded = decodeURIComponent(token);
-        const parsed = JSON.parse(decoded);
-        token = parsed[0]; // Extraemos el token puro
-      }
-
-      const { data: { user } } = await supabaseAdmin.auth.getUser(token);
-      return user?.user_metadata?.role === 'admin';
-    }
-
-    // Alternativa por cabecera Authorization (Postman/Móviles)
-    const authHeader = req.headers.get('Authorization') || '';
-    if (authHeader.startsWith('Bearer ')) {
-      const bearerToken = authHeader.replace('Bearer ', '');
-      const { data: { user } } = await supabaseAdmin.auth.getUser(bearerToken);
-      return user?.user_metadata?.role === 'admin';
-    }
-
-    return false;
-  } catch (error) {
-    console.error('Error al validar permisos en el backend:', error);
-    return false;
-  }
-}
-
-// Handler POST: Gestionar creación, cambio de roles y reseteo de contraseñas
-export async function POST(req: Request) {
-  try {
-    const esAdmin = await comprobarPermisosAdmin(req);
-    if (!esAdmin) {
-      return NextResponse.json({ error: 'Acceso no autorizado' }, { status: 403 });
-    }
-
-    const body = await req.json();
-    const { accion, email, password, userId, nuevoRol } = body;
-
-    if (accion === 'CREAR') {
-      const { data, error } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { role: nuevoRol || 'usuario', full_name: email.split('@')[0] }
-      });
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-      return NextResponse.json({ mensaje: 'Usuario creado exitosamente', usuario: data.user });
-    }
-
-    if (accion === 'MODIFICAR_ROL') {
-      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-        user_metadata: { role: nuevoRol }
-      });
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-      return NextResponse.json({ mensaje: 'Privilegios actualizados correctamente', usuario: data.user });
-    }
-
-    if (accion === 'RESETEAR_PASSWORD') {
-      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-        password: password
-      });
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-      return NextResponse.json({ mensaje: 'Contraseña restablecida con éxito' });
-    }
-
-    return NextResponse.json({ error: 'Acción no válida' }, { status: 400 });
+    if (error) throw error;
+    
+    return NextResponse.json(users);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// Handler GET: Listar todos los usuarios en la consola administrativa
-export async function GET(req: Request) {
+// CREAR NUEVO USUARIO
+export async function POST(request: Request) {
   try {
-    const esAdmin = await comprobarPermisosAdmin(req);
-    if (!esAdmin) {
-      return NextResponse.json({ error: 'Acceso no autorizado' }, { status: 403 });
+    const { email, password, user_metadata } = await request.json();
+
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      email, password, email_confirm: true, user_metadata: user_metadata || { role: 'user' }
+    });
+
+    if (error) throw error;
+
+    // 🔴 NUEVO: Registrar en Auditoría
+    await supabaseAdmin.from('auditoria').insert({
+      actor: 'Administrador', // En un sistema más avanzado, sacaríamos el email del admin logueado
+      accion: 'CREAR_USUARIO',
+      detalles: `Se creó la cuenta para el correo: ${email}`
+    });
+
+    return NextResponse.json({ message: 'Usuario creado exitosamente', user: data.user });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// ACTUALIZAR ESTADO O ROL
+export async function PATCH(request: Request) {
+  try {
+    const { id, accion, role, password } = await request.json();
+    if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
+
+    let updateData: any = {};
+    let detalleAccion = '';
+
+    if (accion === 'suspender') {
+      updateData.ban_duration = '87600h';
+      detalleAccion = `Se suspendió el acceso al ID: ${id}`;
+    } else if (accion === 'activar') {
+      updateData.ban_duration = 'none';
+      detalleAccion = `Se reactivó el acceso al ID: ${id}`;
     }
 
-    const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-    
-    const listaUsuarios = users.map((u) => ({
-      id: u.id,
-      email: u.email,
-      rol: u.user_metadata?.role || 'usuario',
-      ultimaConexion: u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString('es-CL') : 'Nunca'
-    }));
+    if (role) {
+      updateData.user_metadata = { role };
+      detalleAccion = `Se cambió el rol del ID: ${id} a ${role}`;
+    }
 
-    return NextResponse.json({ usuarios: listaUsuarios });
+    const { data, error } = await supabaseAdmin.auth.admin.updateUserById(id, updateData);
+    if (error) throw error;
+
+    // 🔴 NUEVO: Registrar en Auditoría
+    await supabaseAdmin.from('auditoria').insert({
+      actor: 'Administrador',
+      accion: accion ? accion.toUpperCase() : 'MODIFICAR_USUARIO',
+      detalles: detalleAccion
+    });
+
+    return NextResponse.json({ message: 'Actualizado exitosamente', user: data.user });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// ELIMINAR USUARIO
+export async function DELETE(request: Request) {
+  try {
+    const { id } = await request.json();
+    if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
+
+    const { data, error } = await supabaseAdmin.auth.admin.deleteUser(id);
+    if (error) throw error;
+
+    // 🔴 NUEVO: Registrar en Auditoría
+    await supabaseAdmin.from('auditoria').insert({
+      actor: 'Administrador',
+      accion: 'ELIMINAR_USUARIO',
+      detalles: `Se eliminó definitivamente el usuario con ID: ${id}`
+    });
+
+    return NextResponse.json({ message: 'Usuario eliminado' });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
