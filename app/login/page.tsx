@@ -33,6 +33,7 @@ export default function LoginPage() {
       setLoading(false);
     } else {
       router.push('/dashboard/trabajadores');
+      router.refresh();
     }
   };
 
