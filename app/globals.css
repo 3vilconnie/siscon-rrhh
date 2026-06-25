@@ -33,3 +33,6 @@ html, body {
   border-left: 1px solid #dee2e6;
   flex-shrink: 0;
 }
+
+.hover-white:hover { color: #ffffff !important; }
+.transition-colors { transition: background-color 0.2s, color 0.2s; }

@@ -248,7 +248,54 @@ export default function ConsolaAdministradorCompleta() {
 
         {/* COLUMNA DERECHA: Operadores y Auditoría */}
         <div className="col-12 col-lg-8 d-flex flex-column gap-4">
-          
+          {/* NUEVO: FORMULARIO DE CREACIÓN DE OPERADOR */}
+          <div className="card shadow-sm border-0 bg-white p-4 mb-4">
+            <h5 className="fw-bold text-secondary border-bottom pb-2 mb-3">
+              <i className="bi bi-person-plus-fill me-2 text-primary"></i>Crear Nuevo Operador
+            </h5>
+            <form 
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.target as HTMLFormElement;
+                const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+                const role = (form.elements.namedItem('role') as HTMLSelectElement).value;
+
+                try {
+                  const res = await fetch('/api/admin/usuarios', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, role })
+                  });
+                  const data = await res.json();
+                  
+                  if (res.ok) {
+                    // Ya no mostramos la clave provisoria, solo el éxito
+                    alert(`¡Invitación enviada exitosamente a ${email}!\n\nEl usuario recibirá un enlace seguro para acceder y crear su propia contraseña.`);
+                    form.reset();
+                    cargarDatosConsola(); 
+                  } else {
+                    alert(`Error: ${data.error}`);
+                  }
+                } catch (error) {
+                  alert('Error de conexión al crear usuario.');
+                }
+              }}
+              className="row g-3"
+            >
+              <div className="col-md-5">
+                <input type="email" name="email" className="form-control" placeholder="correo@institucion.cl" required />
+              </div>
+              <div className="col-md-4">
+                <select name="role" className="form-select" required>
+                  <option value="usuario">Operador Estándar</option>
+                  <option value="admin">Administrador Global</option>
+                </select>
+              </div>
+              <div className="col-md-3">
+                <button type="submit" className="btn btn-primary w-100 fw-bold">Crear Cuenta</button>
+              </div>
+            </form>
+          </div>
           {/* OPERADORES */}
           <div className="card shadow-sm border-0 bg-white overflow-hidden">
             <div className="card-header bg-dark text-white fw-bold small py-3">

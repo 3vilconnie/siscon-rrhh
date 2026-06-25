@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { Trabajador } from '@/types';
 
 export async function POST(req: Request) {
   try {
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
       }
 
       // Buscamos primero al trabajador
-      let queryTrabajador = supabase.from('trabajadores').select('rut, nombres, primer_apellido, segundo_apellido');
+      let queryTrabajador = supabase.from('trabajadores').select('rut, dv, nombres, primer_apellido, segundo_apellido');
       palabras.forEach((p) => {
         queryTrabajador = queryTrabajador.or(`nombres.ilike.%${p}%,primer_apellido.ilike.%${p}%,segundo_apellido.ilike.%${p}%`);
       });
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
       const pluralText = totalContratos === 1 ? 'contrato registrado' : 'contratos registrados';
 
       return NextResponse.json({
-        respuesta: `📊 **Análisis Contractual:**\n\nEl funcionario **${t.nombres} ${t.primer_apellido}${maternoText}** (RUT: ${t.rut}) cuenta actualmente con **${totalContratos}** ${pluralText} en el sistema **siscon RRHH**.`
+        respuesta: `📊 **Análisis Contractual**\n\n👤 **Funcionario:** ${t.nombres} ${t.primer_apellido}${maternoText}\n🪪 **RUT:** ${t.rut}-${t.dv}\n📄 **Total Contratos:** ${totalContratos}\n\n💡 *Tip: Puedes hacer clic en el botón de expandir chat para leer mejor, o buscar este RUT en la nómina para ver su historial.*`
       });
     }
 

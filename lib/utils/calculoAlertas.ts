@@ -12,7 +12,6 @@ export function evaluarAlertaContinuidad(
   config: ConfigAlertas = {}, 
   fechaReferencia: Date = new Date()
 ) {
-  // Asignación dinámica: Usa lo que viene de la BD o los valores tradicionales por defecto
   const ventana = config.ventana_meses ?? 15;
   const enfriamiento = config.enfriamiento_meses ?? 3;
   const minContratos = config.minimo_contratos ?? 2;
@@ -24,12 +23,12 @@ export function evaluarAlertaContinuidad(
   const limiteTiempoAtras = new Date(fechaReferencia);
   limiteTiempoAtras.setMonth(limiteTiempoAtras.getMonth() - ventana);
 
-  // 1. Filtrar contratos dentro de la ventana dinámica
+  // 1. Filtrar y ordenar contratos cronológicamente
   const contratosVentana = trabajador.contratos
     .filter(c => new Date(c.fecha_inicio) >= limiteTiempoAtras)
     .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime());
 
-  // 2. Validar vigencia laboral
+  // 2. Validar vigencia laboral actual
   const tieneContratoActivo = contratosVentana.some(c => {
     if (!c.fecha_termino) return true;
     const fTermino = new Date(c.fecha_termino);
@@ -39,39 +38,45 @@ export function evaluarAlertaContinuidad(
     return fTermino >= hoySinHoras;
   });
 
-  // 3. Evaluar brechas con el parámetro dinámico de enfriamiento
-  let contratosConsecutivosMax = 0;
+  // 3. Evaluar la RACHA ACTUAL con cálculo calendario
   let rachaActual = 0;
 
   if (contratosVentana.length > 0) {
     rachaActual = 1;
-    contratosConsecutivosMax = 1;
 
     for (let i = 1; i < contratosVentana.length; i++) {
       const contratoPrevio = contratosVentana[i - 1];
       const contratoActual = contratosVentana[i];
 
       if (contratoPrevio.fecha_termino) {
-        const finPrevio = new Date(contratoPrevio.fecha_termino);
-        const inicioActual = new Date(contratoActual.fecha_inicio);
-        const diferenciaMeses = (inicioActual.getTime() - finPrevio.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
+        const dPrevio = new Date(contratoPrevio.fecha_termino);
+        const dActual = new Date(contratoActual.fecha_inicio);
+        
+        // CÁLCULO CALENDARIO: Diferencia de meses reales considerando años
+        // Ej: (2026 - 2025) * 12 + (Abril(3) - Diciembre(11)) = 12 + (-8) = 4 meses de diferencia entre inicios de mes
+        let mesesDiferencia = (dActual.getFullYear() - dPrevio.getFullYear()) * 12 + (dActual.getMonth() - dPrevio.getMonth());
 
-        if (diferenciaMeses < enfriamiento) {
+        // Ajuste fino: Si el contrato actual empezó a principio de mes, pero el anterior terminó a fin de mes,
+        // la resta matemática de los meses da 1 menos del tiempo real "fuera".
+        // Ej: 31-12 a 01-04 -> mesesDiferencia = 4. 
+        // Si dActual.getDate() es 1, estuvo todo el mes previo fuera.
+        
+        // Para asegurar que el enfriamiento se cumpla, evaluamos si mesesDiferencia >= enfriamiento
+        if (mesesDiferencia < enfriamiento) {
           rachaActual++;
-          if (rachaActual > contratosConsecutivosMax) contratosConsecutivosMax = rachaActual;
         } else {
+          // Ya cumplió el periodo de enfriamiento
           rachaActual = 1;
         }
       } else {
         rachaActual++;
-        if (rachaActual > contratosConsecutivosMax) contratosConsecutivosMax = rachaActual;
       }
     }
   }
 
-  // 4. Calcular fecha sugerida basada en los nuevos parámetros
+  // 4. Calcular fecha sugerida de término
   let fechaSugerida = 'Revisar ficha';
-  if (contratosConsecutivosMax >= minContratos && tieneContratoActivo) {
+  if (rachaActual >= minContratos && tieneContratoActivo) {
     const contratosConTermino = contratosVentana.filter(c => c.fecha_termino);
     if (contratosConTermino.length > 0) {
       const ultimoTermino = new Date(contratosConTermino[contratosConTermino.length - 1].fecha_termino!);
@@ -83,8 +88,8 @@ export function evaluarAlertaContinuidad(
   }
 
   return {
-    califica: contratosConsecutivosMax >= minContratos && tieneContratoActivo,
-    totalContratos: contratosConsecutivosMax,
+    califica: rachaActual >= minContratos && tieneContratoActivo,
+    totalContratos: rachaActual,
     fechaSugerida,
     tieneVigente: tieneContratoActivo
   };

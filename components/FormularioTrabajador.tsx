@@ -1,12 +1,14 @@
 'use client';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import toast from 'react-hot-toast'; // <-- Implementamos react-hot-toast
 
 export default function FormularioTrabajador() {
-  const [rut, setRut] = useState('');
+  // Estado para el RUT limpio (para la BD) y formateado (para la vista)
+  const [rutRaw, setRutRaw] = useState('');
+  const [rutDisplay, setRutDisplay] = useState('');
   const [dv, setDv] = useState('');
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<{ type: 'success' | 'danger' | ''; text: string }>({ type: '', text: '' });
 
   // Campos de Texto
   const [nombres, setNombres] = useState('');
@@ -14,7 +16,7 @@ export default function FormularioTrabajador() {
   const [segundoApellido, setSegundoApellido] = useState('');
   
   // Campos del Contrato
-  const [jornada, setJornada] = useState('42');
+  const [jornada, setJornada] = useState('44'); // Lo actualicé a 44 hrs por ser el estándar actual
   const [sueldoBase, setSueldoBase] = useState('');
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaTermino, setFechaTermino] = useState('');
@@ -22,7 +24,7 @@ export default function FormularioTrabajador() {
   // Estado para bloquear/desbloquear dinámicamente los campos de identidad
   const [existeTrabajador, setExisteTrabajador] = useState(false);
 
-  // LÓGICA 1: Calcular DV Chileno automáticamente
+  // Calcular DV Chileno automáticamente
   const calcularDV = (rutAux: string) => {
     let M = 0, S = 1;
     let T = parseInt(rutAux);
@@ -32,14 +34,24 @@ export default function FormularioTrabajador() {
     return S ? (S - 1).toString() : 'K';
   };
 
-  // Permitir escribir en el input de RUT
+  // Formatear RUT con puntos mientras el usuario escribe
   const handleRutChange = (valor: string) => {
-    setRut(valor);
+    // 1. Extraer solo números
+    const soloNumeros = valor.replace(/[^0-9]/g, '');
+    setRutRaw(soloNumeros);
+
+    // 2. Aplicar separador de miles (Puntos)
+    if (soloNumeros) {
+      const formateado = parseInt(soloNumeros, 10).toLocaleString('es-CL');
+      setRutDisplay(formateado);
+    } else {
+      setRutDisplay('');
+    }
   };
 
-  // NUEVA FUNCIÓN: Limpiar por completo todos los datos y alertas del formulario
   const handleLimpiarFormulario = () => {
-    setRut('');
+    setRutRaw('');
+    setRutDisplay('');
     setDv('');
     setNombres('');
     setPrimerApellido('');
@@ -47,102 +59,88 @@ export default function FormularioTrabajador() {
     setSueldoBase('');
     setFechaInicio('');
     setFechaTermino('');
-    setJornada('42'); // Vuelve a la jornada base predeterminada
-    setExisteTrabajador(false); // Desbloquea los campos
-    setMsg({ type: '', text: '' }); // Quita los carteles de alerta
+    setJornada('44');
+    setExisteTrabajador(false);
   };
 
-  // LÓGICA 2: Al presionar TAB o salir del campo RUT, buscar si ya existe
+  // Buscar si el trabajador ya existe al salir del campo (onBlur)
   const handleRutBlur = async () => {
-    const cleanRut = rut.replace(/[^0-9]/g, ''); // Limpiar puntos o letras
-    if (!cleanRut) return;
+    if (!rutRaw) return;
 
-    setRut(cleanRut);
     // Calcular y asignar DV en tiempo real
-    const dvCalculado = calcularDV(cleanRut);
+    const dvCalculado = calcularDV(rutRaw);
     setDv(dvCalculado);
 
-    // Buscar en Supabase si el trabajador ya está registrado
+    const toastId = toast.loading('Buscando registro en el sistema...');
+
+    // Buscar en Supabase
     const { data: trabajador, error } = await supabase
       .from('trabajadores')
       .select('*')
-      .eq('rut', parseInt(cleanRut))
+      .eq('rut', parseInt(rutRaw))
       .single();
 
     if (trabajador && !error) {
-      // ¡Autocompletar datos de identidad! El operador no tendrá que reescribirlos
       setNombres(trabajador.nombres);
       setPrimerApellido(trabajador.primer_apellido);
       setSegundoApellido(trabajador.segundo_apellido || '');
-      setExisteTrabajador(true); // Activa el bloqueo de los inputs
-      setMsg({ type: 'success', text: 'Trabajador encontrado en el sistema. Los nuevos datos generarán un nuevo contrato.' });
+      setExisteTrabajador(true);
+      
+      toast.success('Funcionario encontrado. Datos de identidad bloqueados.', { id: toastId });
     } else {
-      // Es un trabajador completamente nuevo, limpiar campos para llenado manual
       setNombres('');
       setPrimerApellido('');
       setSegundoApellido('');
-      setExisteTrabajador(false); // Permite la escritura manual
-      setMsg({ type: '', text: '' });
+      setExisteTrabajador(false);
+      
+      toast.dismiss(toastId); // Solo quitamos el estado de carga si es nuevo
     }
   };
 
-  // LÓGICA 3: Guardar el Formulario
+  // Guardar el Formulario
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setMsg({ type: '', text: '' });
-
-    // =========================================================
-    // VALIDACIÓN PREVENTIVA DE TRASLAPE DE FECHAS (CAPA 2)
-    // =========================================================
+    
     if (!fechaInicio) {
-      setMsg({ type: 'danger', text: 'La fecha de inicio es obligatoria.' });
-      setLoading(false);
+      toast.error('La fecha de inicio es obligatoria.');
       return;
     }
 
     if (fechaTermino && new Date(fechaTermino) < new Date(fechaInicio)) {
-      setMsg({ type: 'danger', text: '🚨 Error: La fecha de término no puede ser anterior a la de inicio.' });
-      setLoading(false);
+      toast.error('La fecha de término no puede ser anterior a la de inicio.');
       return;
     }
 
+    setLoading(true);
+    const toastId = toast.loading('Procesando registro...');
+
     try {
-      // 1. Consultar si este RUT ya registra otros contratos en la base de datos
+      // 1. Consultar traslapes de contratos
       const { data: contratosExistentes, error: errBusqueda } = await supabase
         .from('contratos')
         .select('fecha_inicio, fecha_termino')
-        .eq('trabajador_rut', parseInt(rut)); // Compara con el RUT digitado
+        .eq('trabajador_rut', parseInt(rutRaw));
 
       if (!errBusqueda && contratosExistentes && contratosExistentes.length > 0) {
         const inicioNuevo = new Date(fechaInicio);
         const terminoNuevo = fechaTermino ? new Date(fechaTermino) : new Date('2099-12-31');
 
-        // Evaluar colisión de periodos usando la fórmula matemática
         const hayTraslape = contratosExistentes.some(contrato => {
           const inicioExistente = new Date(contrato.fecha_inicio);
           const terminoExistente = contrato.fecha_termino ? new Date(contrato.fecha_termino) : new Date('2099-12-31');
-          
           return (inicioNuevo <= terminoExistente && terminoNuevo >= inicioExistente);
         });
 
         if (hayTraslape) {
-          setMsg({
-            type: 'danger',
-            text: '🚨 Restricción Contractual: El período ingresado se superpone o choca con las fechas de otro contrato ya registrado para este funcionario.'
-          });
+          toast.error('El período ingresado se superpone con las fechas de otro contrato ya registrado.', { id: toastId, duration: 5000 });
           setLoading(false);
-          return; // Detiene el envío e impide que golpee la base de datos
+          return; 
         }
       }
 
-      // =========================================================
-      // SI PASÓ EL FILTRO, SE GUARDA NORMALMENTE
-      // =========================================================
-      
-      // 1. Guardar/Actualizar Identidad
+      // 2. Guardar Identidad
       const { error: errTrabajador } = await supabase.from('trabajadores').upsert({
-        rut: parseInt(rut),
+        rut: parseInt(rutRaw),
         dv: dv.toUpperCase(),
         nombres: nombres.toUpperCase().trim(),
         primer_apellido: primerApellido.toUpperCase().trim(),
@@ -151,9 +149,9 @@ export default function FormularioTrabajador() {
 
       if (errTrabajador) throw errTrabajador;
 
-      // 2. Insertar nuevo periodo contractual
+      // 3. Insertar Contrato
       const { error: errContrato } = await supabase.from('contratos').insert({
-        trabajador_rut: parseInt(rut),
+        trabajador_rut: parseInt(rutRaw),
         jornada: parseInt(jornada),
         sueldo_base: parseFloat(sueldoBase),
         fecha_inicio: fechaInicio,
@@ -162,63 +160,75 @@ export default function FormularioTrabajador() {
 
       if (errContrato) throw errContrato;
 
-      setMsg({ type: 'success', text: '¡Ficha contractual e identidad guardadas exitosamente!' });
-      
-      // Llamamos al método de limpieza para dejar el formulario listo de inmediato
+      toast.success('¡Ficha contractual e identidad guardadas exitosamente!', { id: toastId });
       handleLimpiarFormulario();
+      
     } catch (error: any) {
-      setMsg({ type: 'danger', text: `Error al guardar: ${error.message}` });
+      toast.error(`Error al guardar: ${error.message}`, { id: toastId });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="card shadow-sm border-0 justify-content-center" style={{ maxWidth: '800px' }}>
-      <div className="card-header bg-primary text-white fw-bold">
-        <i className="bi bi-person-gear me-2"></i> Formulario de Personal y Contratos
+    <div className="card shadow-sm border-0 justify-content-center w-100" style={{ maxWidth: '850px' }}>
+      <div className="card-header bg-dark text-white fw-bold d-flex align-items-center">
+        <i className="bi bi-person-lines-fill me-2 fs-5"></i> Formulario de Personal y Contratos
       </div>
-      <form onSubmit={handleSubmit} className="card-body p-4">
+      
+      <form onSubmit={handleSubmit} className="card-body p-4 p-md-5">
         
-        {msg.text && (
-          <div className={`alert alert-${msg.type} small py-2`} role="alert">
-            {msg.text}
+        {/* Notificación visual de trabajador existente */}
+        {existeTrabajador && (
+          <div className="alert alert-info py-2 d-flex align-items-center small shadow-sm mb-4">
+            <i className="bi bi-info-circle-fill me-2 fs-5"></i>
+            <div>
+              <strong>Funcionario Vinculado:</strong> Los datos de identidad están bloqueados para evitar alteraciones accidentales. Solo se agregará un nuevo registro al historial de contratos.
+            </div>
           </div>
         )}
 
-        <h5 className="text-secondary border-bottom pb-2 mb-3 fw-bold small text-uppercase">1. Datos de Identidad</h5>
+        <h6 className="text-secondary border-bottom pb-2 mb-4 fw-bold text-uppercase d-flex align-items-center">
+          <span className="bg-primary text-white rounded-circle d-inline-flex justify-content-center align-items-center me-2" style={{ width: '24px', height: '24px', fontSize: '12px' }}>1</span>
+          Datos de Identidad
+        </h6>
         
-        <div className="row g-3 mb-4">
-          {/* Campo RUT */}
-          <div className="col-md-3">
-            <label className="form-label small fw-bold text-secondary">RUT (Sin puntos ni guión)</label>
+        <div className="row g-3 mb-5">
+          {/* Campo RUT (Ahora formateado) */}
+          <div className="col-8 col-md-4">
+            <label className="form-label small fw-bold text-secondary">RUT (Solo números)</label>
             <input
               type="text"
               className="form-control"
-              placeholder="RUT"
-              value={rut}
+              placeholder="Ej: 12.345.678"
+              value={rutDisplay}
               onChange={(e) => handleRutChange(e.target.value)}
               onBlur={handleRutBlur}
+              required
             />
           </div>
 
           {/* Campo DV */}
-          <div className="col-md-1">
+          <div className="col-4 col-md-2">
             <label className="form-label small fw-bold text-secondary">DV</label>
             <input
               type="text"
               className="form-control fw-bold text-center bg-light"
               value={dv}
               readOnly
+              tabIndex={-1}
             />
           </div>
 
           {/* Campo Nombres */}
-          <div className="col-md-8">
-            <label className="form-label small fw-bold text-secondary">Nombres</label>
+          <div className="col-md-6">
+            <label className="form-label small fw-bold text-secondary d-flex justify-content-between">
+              Nombres 
+              {existeTrabajador && <i className="bi bi-lock-fill text-warning" title="Dato bloqueado por el sistema"></i>}
+            </label>
             <input
               type="text"
-              className={`form-control ${existeTrabajador ? 'bg-light text-muted fw-medium' : ''}`}
+              className={`form-control ${existeTrabajador ? 'bg-light text-muted border-warning text-uppercase fw-semibold' : 'text-uppercase'}`}
               placeholder="NOMBRES"
               value={nombres}
               onChange={(e) => setNombres(e.target.value)}
@@ -229,10 +239,13 @@ export default function FormularioTrabajador() {
 
           {/* Campo Primer Apellido */}
           <div className="col-md-6">
-            <label className="form-label small fw-bold text-secondary">Primer Apellido</label>
+            <label className="form-label small fw-bold text-secondary d-flex justify-content-between">
+              Primer Apellido
+              {existeTrabajador && <i className="bi bi-lock-fill text-warning"></i>}
+            </label>
             <input
               type="text"
-              className={`form-control ${existeTrabajador ? 'bg-light text-muted fw-medium' : ''}`}
+              className={`form-control ${existeTrabajador ? 'bg-light text-muted border-warning text-uppercase fw-semibold' : 'text-uppercase'}`}
               placeholder="APELLIDO PATERNO"
               value={primerApellido}
               onChange={(e) => setPrimerApellido(e.target.value)}
@@ -243,10 +256,13 @@ export default function FormularioTrabajador() {
 
           {/* Campo Segundo Apellido */}
           <div className="col-md-6">
-            <label className="form-label small fw-bold text-secondary">Segundo Apellido</label>
+            <label className="form-label small fw-bold text-secondary d-flex justify-content-between">
+              Segundo Apellido
+              {existeTrabajador && <i className="bi bi-lock-fill text-warning"></i>}
+            </label>
             <input
               type="text"
-              className={`form-control ${existeTrabajador ? 'bg-light text-muted fw-medium' : ''}`}
+              className={`form-control ${existeTrabajador ? 'bg-light text-muted border-warning text-uppercase fw-semibold' : 'text-uppercase'}`}
               placeholder="APELLIDO MATERNO"
               value={segundoApellido}
               onChange={(e) => setSegundoApellido(e.target.value)}
@@ -255,39 +271,59 @@ export default function FormularioTrabajador() {
           </div>
         </div>
 
-        <h5 className="text-secondary border-bottom pb-2 mb-3 fw-bold small text-uppercase">2. Estructura Contractual</h5>
-        <div className="row g-3 mb-4">
-          <div className="col-md-4">
-            <label className="form-label small fw-semibold">Horas Semanales (Jornada)</label>
-            <input type="number" className="form-control" value={jornada} onChange={(e) => setJornada(e.target.value)} required />
+        <h6 className="text-secondary border-bottom pb-2 mb-4 fw-bold text-uppercase d-flex align-items-center">
+          <span className="bg-primary text-white rounded-circle d-inline-flex justify-content-center align-items-center me-2" style={{ width: '24px', height: '24px', fontSize: '12px' }}>2</span>
+          Estructura Contractual
+        </h6>
+        
+        <div className="row g-3 mb-5">
+          <div className="col-md-3">
+            <label className="form-label small fw-semibold">Jornada Semanal</label>
+            <div className="input-group">
+              <input type="number" className="form-control" value={jornada} onChange={(e) => setJornada(e.target.value)} required />
+              <span className="input-group-text bg-light text-muted">Hrs.</span>
+            </div>
           </div>
+          
           <div className="col-md-4">
-            <label className="form-label small fw-semibold">Sueldo Base ($)</label>
-            <input type="number" className="form-control" placeholder="650000" value={sueldoBase} onChange={(e) => setSueldoBase(e.target.value)} required />
+            <label className="form-label small fw-semibold">Sueldo Base Bruto</label>
+            <div className="input-group">
+              <span className="input-group-text bg-light text-muted">$</span>
+              <input type="number" className="form-control" placeholder="650000" value={sueldoBase} onChange={(e) => setSueldoBase(e.target.value)} required />
+            </div>
           </div>
+          
+          <div className="col-md-5 d-none d-md-block"></div> {/* Espaciador para la grilla */}
+
           <div className="col-md-4">
-            <label className="form-label small fw-semibold">Fecha Inicio</label>
+            <label className="form-label small fw-semibold">Fecha de Inicio</label>
             <input type="date" className="form-control" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required />
           </div>
+          
           <div className="col-md-4">
-            <label className="form-label small fw-semibold">Fecha Término (Opcional)</label>
+            <label className="form-label small fw-semibold">Fecha de Término</label>
             <input type="date" className="form-control" value={fechaTermino} onChange={(e) => setFechaTermino(e.target.value)} />
+            <div className="form-text" style={{ fontSize: '0.75rem' }}>Dejar vacío si es indefinido.</div>
           </div>
         </div>
 
-        {/* CONTENEDOR DE ACCIONES CON EL NUEVO BOTÓN */}
-        <div className="d-flex gap-2">
-          <button type="submit" className="btn btn-primary px-4 fw-bold" disabled={loading}>
-            {loading ? 'Guardando Registro...' : 'Guardar Ficha Contractual'}
+        {/* ACCIONES */}
+        <div className="d-flex flex-column flex-sm-row gap-3 pt-3 border-top">
+          <button type="submit" className="btn btn-success px-4 py-2 fw-bold" disabled={loading || !rutRaw}>
+            {loading ? (
+              <><span className="spinner-border spinner-border-sm me-2"></span> Registrando...</>
+            ) : (
+              <><i className="bi bi-save-fill me-2"></i> Guardar Ficha Contractual</>
+            )}
           </button>
           
           <button 
             type="button" 
-            className="btn btn-outline-secondary px-4" 
+            className="btn btn-outline-secondary px-4 py-2 fw-semibold" 
             onClick={handleLimpiarFormulario}
             disabled={loading}
           >
-            <i className="bi bi-eraser-fill me-1"></i> Limpiar Campos
+            <i className="bi bi-eraser-fill me-2"></i> Limpiar Campos
           </button>
         </div>
       </form>

@@ -22,25 +22,35 @@ export async function GET() {
   }
 }
 
-// CREAR NUEVO USUARIO
+// app/api/admin/usuarios/route.ts
+
+// CREAR NUEVO USUARIO (Vía Invitación Segura)
 export async function POST(request: Request) {
   try {
-    const { email, password, user_metadata } = await request.json();
+    const { email, role } = await request.json();
 
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email, password, email_confirm: true, user_metadata: user_metadata || { role: 'user' }
+    // Utilizamos inviteUserByEmail en lugar de createUser
+    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: { 
+        role: role || 'usuario',
+        force_password_change: true // Mantenemos la bandera para obligarlo a cambiar la clave
+      }
+      // Opcional: redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/actualizar-password`
     });
 
     if (error) throw error;
 
-    // 🔴 NUEVO: Registrar en Auditoría
+    // Registrar en Auditoría
     await supabaseAdmin.from('auditoria').insert({
-      actor: 'Administrador', // En un sistema más avanzado, sacaríamos el email del admin logueado
-      accion: 'CREAR_USUARIO',
-      detalles: `Se creó la cuenta para el correo: ${email}`
+      actor: 'Administrador', 
+      accion: 'INVITAR_USUARIO',
+      detalles: `Se envió invitación de acceso al correo: ${email} con rol ${role}`
     });
 
-    return NextResponse.json({ message: 'Usuario creado exitosamente', user: data.user });
+    return NextResponse.json({ 
+      message: 'Invitación enviada exitosamente', 
+      user: data.user
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

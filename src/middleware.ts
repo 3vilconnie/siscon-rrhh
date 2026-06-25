@@ -37,29 +37,40 @@ export async function middleware(request: NextRequest) {
   );
 
   // 3. Obtenemos el usuario de forma segura llamando a la API de Supabase
-  // Esto no solo lee la cookie, sino que verifica que sea válida en el servidor
   const { data: { user } } = await supabase.auth.getUser();
 
   // 4. Definimos las rutas a proteger
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login');
   const isDashboardRoute = request.nextUrl.pathname.startsWith('/dashboard');
-  const isApiAdminRoute = request.nextUrl.pathname.startsWith('/api/admin');
+  const isAdminRoute = request.nextUrl.pathname.startsWith('/dashboard/admin'); // <-- NUEVA: Detectar la ruta web de admin
+  const isApiAdminRoute = request.nextUrl.pathname.startsWith('/api/admin');     // Detectar endpoints de la API de admin
 
   // --- REGLAS DE PROTECCIÓN ---
 
-  // Si intenta ir al dashboard sin estar logueado, lo mandamos al login
+  // REGLA 1: Si intenta ir al dashboard sin estar logueado, lo mandamos al login
   if (isDashboardRoute && !user) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Si intenta ir al login pero ya está logueado, lo mandamos al dashboard
+  // REGLA 2: Si intenta ir al login pero ya está logueado, lo mandamos al dashboard
   if (isAuthRoute && user) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(new URL('/dashboard/trabajadores', request.url));
   }
 
-  // (Opcional pero recomendado) Proteger las rutas de API de administración en el Middleware
-  if (isApiAdminRoute && !user) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  // REGLA 3: RESTRICCIÓN DE ACCESO POR ROL ADMINISTRADOR (Servidor Seguro)
+  const userRole = user?.user_metadata?.role; // Extraemos el rol guardado de forma segura en los metadatos
+
+  if ((isAdminRoute || isApiAdminRoute) && userRole !== 'admin') {
+    // Si es una petición a la API (Backend), respondemos con un error HTTP 403 Forbidden (Prohibido)
+    if (isApiAdminRoute) {
+      return NextResponse.json(
+        { error: 'No autorizado — Se requieren permisos de administrador' }, 
+        { status: 403 }
+      );
+    }
+    
+    // Si es un usuario común intentando entrar por URL a /dashboard/admin, lo expulsamos al listado general de trabajadores
+    return NextResponse.redirect(new URL('/dashboard/trabajadores', request.url));
   }
 
   return supabaseResponse;
@@ -69,11 +80,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Aplica a todas las rutas excepto:
-     * - _next/static (archivos estáticos de Next.js)
-     * - _next/image (optimización de imágenes)
-     * - favicon.ico (ícono del sitio)
-     * - archivos con extensiones públicas (svg, png, jpg, etc.)
+     * Aplica a todas las rutas excepto archivos estáticos o públicos
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],

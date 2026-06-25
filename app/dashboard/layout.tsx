@@ -1,46 +1,50 @@
 'use client';
-import { useState, useEffect } from 'react'; // 👈 Corregido con ambas importaciones nativas
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { supabase } from '../../lib/supabase';
-import { useRouter } from 'next/navigation';
-import NavbarSuperior from '../../components/NavbarSuperior';
-import AiChatSidebar from '../../components/AiChatSidebar';
-import GuardiánInactividad from '../../components/GuardianInactividad';
+import { usePathname, useRouter } from 'next/navigation'; // <-- Importamos usePathname
+import { supabase } from '@/lib/supabase';
+import NavbarSuperior from '@/components/NavbarSuperior';
+import AiChatSidebar from '@/components/AiChatSidebar';
+import GuardiánInactividad from '@/components/GuardianInactividad';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname(); // <-- Instanciamos el hook para saber la ruta actual
   
   // Estados de control de usuario e interfaz
   const [nombreUsuario, setNombreUsuario] = useState<string>('Cargando...');
   const [ultimaConexion, setUltimaConexion] = useState<string>('');
   const [rolUsuario, setRolUsuario] = useState<string>('usuario');
-  const [autorizando, setAutorizando] = useState<boolean>(true); // Cortina de protección visual
+  const [autorizando, setAutorizando] = useState<boolean>(true); 
+  
+  // <-- NUEVO: Estado para colapsar/expandir el menú lateral
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
   useEffect(() => {
     let montado = true;
 
     async function obtenerDatosUsuario() {
       try {
-        // 1. Validar la sesión real contra los servidores de Supabase Auth
         const { data: { user }, error } = await supabase.auth.getUser();
 
-        // 🚨 CONTROL CRÍTICO: Si hay error o no hay usuario, expulsión inmediata sin excepciones
         if (error || !user) {
           console.log("Acceso no autorizado detectado en Layout, redirigiendo...");
           if (montado) {
-            setNombreUsuario('Invitado');
-            router.replace('/login'); // Redirección limpia destruyendo el historial temporal
+            router.replace('/login'); 
           }
           return;
         }
 
-        // Si el usuario existe y está validado por el servidor:
+        if (user.user_metadata?.force_password_change) {
+          if (montado) router.replace('/actualizar-password');
+          return;
+        }
+
         if (montado) {
           const nombre = user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'Usuario';
           setNombreUsuario(nombre);
-
-          const rol = user.user_metadata?.role || 'usuario';
-          setRolUsuario(rol);
+          setRolUsuario(user.user_metadata?.role || 'usuario');
 
           if (user.last_sign_in_at) {
             const fecha = new Date(user.last_sign_in_at);
@@ -50,40 +54,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           } else {
             setUltimaConexion('No registrada');
           }
-
-          // Desactivamos la cortina de carga: es un operador válido
           setAutorizando(false);
         }
-
       } catch (err) {
         console.error('Fallo en la verificación del layout:', err);
-        if (montado) {
-          router.replace('/login');
-        }
+        if (montado) router.replace('/login');
       }
     }
 
     obtenerDatosUsuario();
-
-    // Limpieza al desmontar el componente para evitar fugas de memoria
-    return () => {
-      montado = false;
-    };
+    return () => { montado = false; };
   }, [router]);
 
-  // 🛡️ FUNCIÓN DE CIERRE DE SESIÓN SEGURO Y DESTRUCCIÓN DE COOKIES
   const handleCerrarSesion = async (e: React.MouseEvent) => {
-    e.preventDefault(); // Evitamos que el navegador procese la etiqueta como enlace directo
-    
+    e.preventDefault(); 
     try {
-      // 1. Notificar salida a Supabase
       await supabase.auth.signOut();
-
-      // 2. Destruir físicamente los tokens del navegador expirándolos al año 1970
       document.cookie = "sb-access-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       document.cookie = "sb-refresh-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       
-      // Limpieza iterativa para cualquier cookie residual con prefijo "sb-" de Supabase SSR
       document.cookie.split(";").forEach((c) => {
         if (c.trim().startsWith("sb-")) {
           const nombreCookie = c.split("=")[0].trim();
@@ -91,18 +80,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
       });
 
-      // 3. Purgar almacenamiento local del cliente
       localStorage.removeItem('sb-access-token');
       localStorage.removeItem('sb-refresh-token');
-
-      // 4. Redirección dura forzando la recarga completa para romper la memoria de React
       window.location.href = '/login';
     } catch (err) {
       console.error('Error al procesar el cierre seguro de sesión:', err);
     }
   };
 
-  // CORTINA DE PROTECCIÓN INMEDIATA ANTI-INVITADOS:
+  // Función auxiliar para determinar si una ruta está activa
+  const checkIsActive = (path: string) => {
+    // Si estamos en la raíz del dashboard, que no marque nada erróneamente
+    if (path === '/dashboard' && pathname !== '/dashboard') return false;
+    // Si la ruta actual incluye el path del link, lo marca activo (ej. para subrutas de trabajadores)
+    return pathname.includes(path);
+  };
+
   if (autorizando) {
     return (
       <div className="vh-100 w-100 d-flex flex-column align-items-center justify-content-center bg-dark text-white">
@@ -113,42 +106,99 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
+  // Dimensiones dinámicas de la barra
+  const sidebarWidth = isCollapsed ? '80px' : '260px';
+
   return (
     <GuardiánInactividad>
       <div className="d-flex min-vh-100">
         
         {/* MENÚ LATERAL IZQUIERDO */}
-        <div className="bg-dark text-white p-3 d-flex flex-column justify-content-between" style={{ width: '260px', minWidth: '260px' }}>
+        <div 
+          className="bg-dark text-white d-flex flex-column justify-content-between shadow-lg" 
+          style={{ 
+            width: sidebarWidth, 
+            minWidth: sidebarWidth, 
+            transition: 'width 0.3s ease',
+            overflow: 'hidden'
+          }}
+        >
           
-          <div>
-            <div className="mb-4 pt-2">
-              <h4 className="text-info fw-bold d-flex align-items-center gap-2 m-0">
-                <i className="bi bi-cpu-fill"></i> siscon RRHH
-              </h4>
+          <div className={`p-3 ${isCollapsed ? 'px-2' : ''}`}>
+            {/* Cabecera del Menú / Botón Colapsar */}
+            <div className={`mb-4 pt-2 d-flex align-items-center ${isCollapsed ? 'justify-content-center' : 'justify-content-between'}`}>
+              {!isCollapsed && (
+                <h5 className="text-info fw-bold d-flex align-items-center gap-2 m-0 text-truncate">
+                  <i className="bi bi-cpu-fill"></i> siscon RRHH
+                </h5>
+              )}
+              <button 
+                className="btn btn-sm text-white-50 hover-white p-0 border-0" 
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                title={isCollapsed ? "Expandir menú" : "Ocultar menú"}
+              >
+                <i className={`bi fs-4 ${isCollapsed ? 'bi-list' : 'bi-text-indent-right'}`}></i>
+              </button>
             </div>
             
-            <ul className="nav nav-pills flex-column gap-2">
+            <ul className="nav nav-pills flex-column gap-2 mt-4">
               <li className="nav-item">
-                <Link href="/dashboard/trabajadores" className="nav-link text-white d-flex align-items-center gap-2 py-2">
-                  <i className="bi bi-people"></i> Lista Trabajadores
+                <Link 
+                  href="/dashboard/trabajadores" 
+                  className={`nav-link d-flex align-items-center rounded transition-colors ${
+                    checkIsActive('/dashboard/trabajadores') 
+                      ? 'bg-primary text-white fw-bold shadow-sm' 
+                      : 'text-white-50'
+                  } ${isCollapsed ? 'justify-content-center px-0 py-3' : 'gap-3 py-2 px-3'}`}
+                  title={isCollapsed ? "Lista Trabajadores" : ""}
+                >
+                  <i className="bi bi-people fs-5"></i> 
+                  {!isCollapsed && <span>Lista Trabajadores</span>}
                 </Link>
               </li>
               <li className="nav-item">
-                <Link href="/dashboard/formulario" className="nav-link text-white d-flex align-items-center gap-2 py-2">
-                  <i className="bi bi-person-plus"></i> Registrar Personal
+                <Link 
+                  href="/dashboard/formulario" 
+                  className={`nav-link d-flex align-items-center rounded transition-colors ${
+                    checkIsActive('/dashboard/formulario') 
+                      ? 'bg-primary text-white fw-bold shadow-sm' 
+                      : 'text-white-50'
+                  } ${isCollapsed ? 'justify-content-center px-0 py-3' : 'gap-3 py-2 px-3'}`}
+                  title={isCollapsed ? "Registrar Personal" : ""}
+                >
+                  <i className="bi bi-person-plus fs-5"></i> 
+                  {!isCollapsed && <span>Registrar Personal</span>}
                 </Link>
               </li>
               <li className="nav-item">
-                <Link href="/dashboard/carga-masiva" className="nav-link text-white d-flex align-items-center gap-2 py-2">
-                  <i className="bi bi-cloud-arrow-up"></i> Carga Masiva (SIGPER)
+                <Link 
+                  href="/dashboard/carga-masiva" 
+                  className={`nav-link d-flex align-items-center rounded transition-colors ${
+                    checkIsActive('/dashboard/carga-masiva') 
+                      ? 'bg-primary text-white fw-bold shadow-sm' 
+                      : 'text-white-50'
+                  } ${isCollapsed ? 'justify-content-center px-0 py-3' : 'gap-3 py-2 px-3'}`}
+                  title={isCollapsed ? "Carga Masiva (SIGPER)" : ""}
+                >
+                  <i className="bi bi-cloud-arrow-up fs-5"></i> 
+                  {!isCollapsed && <span className="text-truncate">Carga Masiva</span>}
                 </Link>
               </li>
 
               {/* ENLACE CONDICIONAL ADMINISTRADOR */}
               {rolUsuario === 'admin' && (
-                <li className="nav-item border-top border-secondary pt-2 mt-2">
-                  <Link href="/dashboard/admin" className="nav-link text-warning d-flex align-items-center gap-2 py-2 fw-semibold">
-                    <i className="bi bi-gear-fill"></i> Consola Administrador
+                <li className="nav-item border-top border-secondary pt-3 mt-2">
+                  <Link 
+                    href="/dashboard/admin" 
+                    className={`nav-link d-flex align-items-center rounded transition-colors ${
+                      checkIsActive('/dashboard/admin') 
+                        ? 'bg-warning text-dark fw-bold shadow-sm' 
+                        : 'text-warning'
+                    } ${isCollapsed ? 'justify-content-center px-0 py-3' : 'gap-3 py-2 px-3'}`}
+                    title={isCollapsed ? "Consola Administrador" : ""}
+                  >
+                    <i className="bi bi-gear-fill fs-5"></i> 
+                    {!isCollapsed && <span>Admin Consola</span>}
                   </Link>
                 </li>
               )}
@@ -156,36 +206,59 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* TARJETA DE USUARIO LOGUEADO */}
-          <div className="pt-3 border-top">
-            <div className="d-flex align-items-center gap-2 mb-3 bg-secondary bg-opacity-25 p-2 rounded">
-              <div className="bg-info text-dark rounded-circle d-flex align-items-center justify-content-center fw-bold" style={{ width: '38px', height: '38px', minWidth: '38px' }}>
-                {nombreUsuario.substring(0, 2).toUpperCase()}
-              </div>
-              <div className="overflow-hidden" style={{ lineHeight: '1.2' }}>
-                <div className="fw-bold text-truncate small" title={nombreUsuario}>
-                  {nombreUsuario}
+          <div className="p-3 border-top border-secondary">
+            {isCollapsed ? (
+              // Versión Colapsada del perfil
+              <div className="d-flex flex-column align-items-center gap-3">
+                <div 
+                  className="bg-info text-dark rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm" 
+                  style={{ width: '42px', height: '42px' }}
+                  title={nombreUsuario}
+                >
+                  {nombreUsuario.substring(0, 2).toUpperCase()}
                 </div>
-                <span className="text-info" style={{ fontSize: '10px' }}>
-                  Últ. conexión:<br />
-                  <span className="text-info">{ultimaConexion || 'Cargando...'}</span>
-                </span>
+                <button
+                  onClick={handleCerrarSesion}
+                  className="btn btn-outline-danger border-0 p-2 rounded-circle"
+                  title="Cerrar Sesión"
+                >
+                  <i className="bi bi-box-arrow-left fs-5"></i>
+                </button>
               </div>
-            </div>
+            ) : (
+              // Versión Expandida del perfil
+              <>
+                <div className="d-flex align-items-center gap-3 mb-3 bg-secondary bg-opacity-25 p-2 rounded">
+                  <div className="bg-info text-dark rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm" style={{ width: '42px', height: '42px', minWidth: '42px' }}>
+                    {nombreUsuario.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div className="overflow-hidden" style={{ lineHeight: '1.2' }}>
+                    <div className="fw-bold text-truncate small text-white" title={nombreUsuario}>
+                      {nombreUsuario}
+                    </div>
+                    <span className="text-info" style={{ fontSize: '11px' }}>
+                      Últ. conexión:<br />
+                      <span className="text-white-50">{ultimaConexion || 'Cargando...'}</span>
+                    </span>
+                  </div>
+                </div>
 
-            <button
-              onClick={handleCerrarSesion}
-              className="btn btn-sm btn-outline-danger w-100 d-flex align-items-center justify-content-center gap-2 py-2 fw-semibold"
-            >
-              <i className="bi bi-box-arrow-left"></i> Cerrar Sesión
-            </button>
+                <button
+                  onClick={handleCerrarSesion}
+                  className="btn btn-sm btn-outline-danger w-100 d-flex align-items-center justify-content-center gap-2 py-2 fw-semibold"
+                >
+                  <i className="bi bi-box-arrow-left"></i> Cerrar Sesión
+                </button>
+              </>
+            )}
           </div>
 
         </div>
 
         {/* ÁREA DE CONTENIDO */}
-        <div className="flex-grow-1 d-flex flex-column bg-light" style={{ minWidth: 0 }}>
+        <div className="flex-grow-1 d-flex flex-column bg-light" style={{ minWidth: 0, transition: 'width 0.3s ease' }}>
           <NavbarSuperior />
-          <div className="p-4 flex-grow-1">
+          <div className="p-4 flex-grow-1 overflow-auto">
             {children}
           </div>
         </div>
