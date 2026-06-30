@@ -1,35 +1,28 @@
+// app/dashboard/page.tsx
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import AlertasPanel from '@/components/AlertasPanel';
-
-interface TrabajadorLista {
-  rut: number;
-  dv: string;
-  nombres: string;
-  primer_apellido: string;
-  segundo_apellido: string;
-  contratos: { count: number }[]; // Para capturar el conteo de contratos
-}
+import { Trabajador } from '@/types'; // 👈 IMPORTAMOS EL TIPO CENTRALIZADO
 
 export default function TrabajadoresPage() {
-  const [trabajadores, setTrabajadores] = useState<TrabajadorLista[]>([]);
+  const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function obtenerTrabajadores() {
-      // Modismo de Supabase para traer datos y contar filas relacionales simultáneamente
+      // Supabase infiere automáticamente el tipo si se lo pasamos en el from<>
       const { data, error } = await supabase
         .from('trabajadores')
         .select(`
           rut, dv, nombres, primer_apellido, segundo_apellido,
           contratos(count)
-        `);
+        `)
+        .returns<Trabajador[]>(); // 👈 LE DECIMOS A SUPABASE QUÉ TIPO ESPERAMOS
 
       if (!error && data) {
-        // Mapeamos el tipado correcto de la respuesta
-        setTrabajadores(data as any);
+        setTrabajadores(data); // 👈 YA NO NECESITAMOS "as any"
       }
       setLoading(false);
     }
@@ -48,10 +41,8 @@ export default function TrabajadoresPage() {
         </Link>
       </div>
 
-      {/* Renderizar panel de alertas críticas */}
       <AlertasPanel />
 
-      {/* Tabla de Trabajadores */}
       <div className="card shadow-sm border-0">
         <div className="card-body p-0">
           <div className="table-responsive">
@@ -80,6 +71,7 @@ export default function TrabajadoresPage() {
                   </tr>
                 ) : (
                   trabajadores.map((t) => {
+                    // Accedemos de forma segura a los contratos tipados
                     const totalContratos = t.contratos?.[0]?.count || 0;
                     return (
                       <tr key={t.rut}>

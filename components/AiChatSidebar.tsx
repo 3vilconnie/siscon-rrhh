@@ -23,7 +23,7 @@ export default function AiChatSidebar() {
     }
   }, [mensajes, minimizado, isTyping]); // Agregamos isTyping a la dependencia del scroll
 
-  const handleEnviar = async (e: React.FormEvent) => {
+  const handleEnviar = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim() || isTyping) return;
 
@@ -147,7 +147,20 @@ export default function AiChatSidebar() {
                     whiteSpace: 'pre-line'
                   }}
                 >
-                  {msg.texto}
+                  // Reemplaza la línea donde dice {msg.texto} dentro de tu map, por esto:
+
+                {/* Función auxiliar para renderizar negritas */}
+                {(() => {
+                  // Separa el texto usando una expresión regular para capturar lo que está entre ** **
+                  const partes = msg.texto.split(/(\*\*.*?\*\*)/g);
+                  return partes.map((parte, i) => {
+                    if (parte.startsWith('**') && parte.endsWith('**')) {
+                      // Le quita los asteriscos y lo envuelve en <strong>
+                      return <strong key={i}>{parte.slice(2, -2)}</strong>;
+                    }
+                    return <span key={i}>{parte}</span>;
+                  });
+                })()}
                 </div>
               </div>
             ))}

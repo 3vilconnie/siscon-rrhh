@@ -262,8 +262,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {children}
           </div>
         </div>
-
-        <AiChatSidebar />
         
       </div>
     </GuardiánInactividad>

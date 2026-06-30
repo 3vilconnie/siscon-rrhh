@@ -22,23 +22,22 @@ export async function GET() {
   }
 }
 
-// app/api/admin/usuarios/route.ts
-
 // CREAR NUEVO USUARIO (Vía Invitación Segura)
 export async function POST(request: Request) {
   try {
     const { email, role } = await request.json();
 
-    // Utilizamos inviteUserByEmail en lugar de createUser
-    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      data: { 
-        role: role || 'usuario',
-        force_password_change: true // Mantenemos la bandera para obligarlo a cambiar la clave
-      }
-      // Opcional: redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/actualizar-password`
-    });
+    // 1. Enviamos la invitación (sin pasar data de roles aquí para evitar el user_metadata)
+    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
 
     if (error) throw error;
+
+    // 2. 🛡️ Inmediatamente después, aseguramos el rol en app_metadata
+    if (data.user) {
+      await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
+        app_metadata: { role: role || 'usuario' }
+      });
+    }
 
     // Registrar en Auditoría
     await supabaseAdmin.from('auditoria').insert({
@@ -74,7 +73,8 @@ export async function PATCH(request: Request) {
     }
 
     if (role) {
-      updateData.user_metadata = { role };
+      // 🛡️ CORREGIDO: Se cambia user_metadata por app_metadata
+      updateData.app_metadata = { role };
       detalleAccion = `Se cambió el rol del ID: ${id} a ${role}`;
     }
 

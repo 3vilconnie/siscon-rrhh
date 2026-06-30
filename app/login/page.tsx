@@ -17,7 +17,7 @@ export default function LoginPage() {
   const router = useRouter();
 
   // Handler 1: Manejar el Inicio de Sesión Estándar
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
@@ -38,7 +38,7 @@ export default function LoginPage() {
   };
 
   // Handler 2: Manejar la Solicitud de Correo de Restablecimiento
-  const handleRecuperarPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleRecuperarPassword = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');

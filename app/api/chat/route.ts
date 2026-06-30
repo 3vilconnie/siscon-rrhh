@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       const pluralText = totalContratos === 1 ? 'contrato registrado' : 'contratos registrados';
 
       return NextResponse.json({
-        respuesta: `📊 **Análisis Contractual**\n\n👤 **Funcionario:** ${t.nombres} ${t.primer_apellido}${maternoText}\n🪪 **RUT:** ${t.rut}-${t.dv}\n📄 **Total Contratos:** ${totalContratos}\n\n💡 *Tip: Puedes hacer clic en el botón de expandir chat para leer mejor, o buscar este RUT en la nómina para ver su historial.*`
+        respuesta: `📊 Análisis Contractual\n\n👤 Funcionario: ${t.nombres} ${t.primer_apellido}${maternoText}\n🪪 RUT: ${t.rut}-${t.dv}\n📄 Total Contratos: ${totalContratos}\n\n💡 *Tip: Puedes hacer clic en el botón de expandir chat para leer mejor, o buscar este RUT en la nómina para ver su historial.`
       });
     }
 
@@ -84,10 +84,10 @@ export async function POST(req: Request) {
         return NextResponse.json({ respuesta: `No encontré ningún funcionario en la nómina que coincida con "${nombreBuscar}".` });
       }
 
-      let respuestaText = `🔍 **Resultado de la búsqueda analítica:**\n`;
+      let respuestaText = `🔍 --Resultado de la búsqueda analítica:--\n`;
       trabajadores.forEach((t) => {
         const maternoText = t.segundo_apellido ? ` ${t.segundo_apellido}` : '';
-        respuestaText += `\n• **Nombre:** ${t.nombres} ${t.primer_apellido}${maternoText}\n  **RUT:** ${t.rut}-${t.dv}\n`;
+        respuestaText += `\n• Nombre: ${t.nombres} ${t.primer_apellido}${maternoText}\n  RUT: ${t.rut}-${t.dv}\n`;
       });
 
       return NextResponse.json({ respuesta: respuestaText });
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
     // RESPUESTA POR DEFECTO / BIENVENIDA
     // ----------------------------------------------------------------------
     return NextResponse.json({ 
-      respuesta: 'Hola. Soy tu Asistente Analítico. Puedo ayudarte a consultar la información del personal en Supabase. Prueba preguntándome: "datos de Julia Alcon" o "cuantos contratos tiene julia alcon".' 
+      respuesta: 'Hola. Soy tu Asistente. Puedo ayudarte a consultar la información del personal en Supabase. Prueba preguntándome: "datos de Julia Alcon" o "cuantos contratos tiene julia alcon".' 
     });
 
   } catch (error: any) {

@@ -7,16 +7,6 @@ import Link from 'next/link';
 import { evaluarAlertaContinuidad } from '@/lib/utils/calculoAlertas';
 import { AlertaNotificacion, Trabajador } from '@/types';
 
-interface AlertaContrato {
-  rut: number;
-  dv: string;
-  nombres: string;
-  primer_apellido: string;
-  segundo_apellido: string | null;
-  total_contratos: number;
-  tiene_vigente: boolean;
-  fecha_sugerida_retorno?: string;
-}
 
 export default function ReporteAlertasPage() {
   const searchParams = useSearchParams();
