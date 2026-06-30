@@ -51,3 +51,21 @@ export interface LogAuditoria {
   detalles: string;
   creado_en: string;
 }
+
+export interface RegistroHoraCompensatoria {
+  id: string;
+  trabajador_rut: number;
+  fecha: string;
+  horas_solicitadas: number;
+  creado_en?: string;
+}
+
+// Interfaz para el resumen mensual/anual (Simulación de Hoja 1)
+export interface ResumenHorasFuncionario {
+  rut: number;
+  dv: string;
+  nombreCompleto: string;
+  horasConsumidasAnuales: number;
+  horasDisponiblesAnuales: number; // 44 - horasConsumidasAnuales
+  horasConsumidasMesSeleccionado: number;
+}

@@ -185,6 +185,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </Link>
               </li>
 
+              <li className="nav-item">
+                <Link 
+                  href="/dashboard/horas-compensatorias" 
+                  className={`nav-link d-flex align-items-center rounded transition-colors ${
+                    checkIsActive('/dashboard/horas-compensatorias') 
+                      ? 'bg-primary text-white fw-bold shadow-sm' 
+                      : 'text-white-50'
+                  } ${isCollapsed ? 'justify-content-center px-0 py-3' : 'gap-3 py-2 px-3'}`}
+                  title={isCollapsed ? "Horas Compensatorias" : ""}
+                >
+                  <i className="bi bi-clock-history fs-5"></i> 
+                  {!isCollapsed && <span>Horas Compensatorias</span>}
+                </Link>
+              </li>
+
               {/* ENLACE CONDICIONAL ADMINISTRADOR */}
               {rolUsuario === 'admin' && (
                 <li className="nav-item border-top border-secondary pt-3 mt-2">
