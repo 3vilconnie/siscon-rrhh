@@ -8,12 +8,22 @@ interface MensajeChat {
 
 export default function AiChatSidebar() {
   const [minimizado, setMinimizado] = useState(false);
-  const [expandido, setExpanded] = useState(false); // <-- Nuevo estado para el ancho
-  const [isTyping, setIsTyping] = useState(false); // <-- Nuevo estado para animación de carga
+  const [expandido, setExpanded] = useState(false); 
+  const [isTyping, setIsTyping] = useState(false); 
   const [input, setInput] = useState('');
   const [mensajes, setMensajes] = useState<MensajeChat[]>([
-    { rol: 'assistant', texto: '¡Hola! Soy el asistente de siscon RRHH. Puedes pedirme buscar fichas de personal, sueldos o ver quiénes están en alerta legal de 15 meses.' }
+    { 
+      rol: 'assistant', 
+      texto: '¡Hola! Soy el asistente analítico de siscon RRHH. Puedo ayudarte a auditar las fichas de personal, revisar sueldos y consultar el historial acumulado en Supabase.' 
+    }
   ]);
+
+  // UX: Burbujas inteligentes de un solo clic con consultas comunes de ejemplo
+  const sugerenciasIniciales = [
+    { titulo: '📄 Contratos de Julia', query: 'cuantos contratos tiene julia alcon' },
+    { titulo: '🔍 Datos de Julia', query: 'datos de julia alcon' },
+    { titulo: '⚠️ Ver panel de alertas', query: '¿Qué alertas de continuidad hay vigentes?' }
+  ];
 
   const finMensajesRef = useRef<HTMLDivElement>(null);
 
@@ -21,24 +31,21 @@ export default function AiChatSidebar() {
     if (!minimizado) {
       finMensajesRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [mensajes, minimizado, isTyping]); // Agregamos isTyping a la dependencia del scroll
+  }, [mensajes, minimizado, isTyping]);
 
-  const handleEnviar = async (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!input.trim() || isTyping) return;
+  const realizarConsultaChat = async (textoEnviar: string) => {
+    if (!textoEnviar.trim() || isTyping) return;
 
-    const mensajeUsuario = input;
-    const nuevoMensajeUsuario: MensajeChat = { rol: 'user', texto: mensajeUsuario };
-    
+    const nuevoMensajeUsuario: MensajeChat = { rol: 'user', texto: textoEnviar };
     setMensajes((prev) => [...prev, nuevoMensajeUsuario]);
     setInput('');
-    setIsTyping(true); // Activar animación de "escribiendo..."
+    setIsTyping(true); 
 
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mensaje: mensajeUsuario }),
+        body: JSON.stringify({ mensaje: textoEnviar }),
       });
 
       const data = await response.json();
@@ -46,19 +53,22 @@ export default function AiChatSidebar() {
     } catch (err) {
       setMensajes((prev) => [...prev, { 
         rol: 'assistant', 
-        texto: 'Lo siento, ocurrió un error de conexión al consultar la base de datos.' 
+        texto: 'Lo siento, ocurrió un error de conexión al consultar la base de datos analítica.' 
       }]);
     } finally {
-      setIsTyping(false); // Apagar la animación al terminar
+      setIsTyping(false); 
     }
   };
 
-  // Determinar el ancho actual basado en el estado
+  const handleEnviar = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    realizarConsultaChat(input);
+  };
+
   const chatWidth = expandido ? '450px' : '340px';
 
   return (
     <>
-      {/* CSS inyectado para la animación de los 3 puntos */}
       <style>{`
         .typing-indicator span {
           display: inline-block;
@@ -74,6 +84,11 @@ export default function AiChatSidebar() {
         @keyframes bounce {
           0%, 80%, 100% { transform: scale(0); }
           40% { transform: scale(1); }
+        }
+        .burbuja-sugerencia:hover {
+          background-color: #e9ecef !important;
+          border-color: #0d6efd !important;
+          color: #0d6efd !important;
         }
       `}</style>
 
@@ -93,7 +108,6 @@ export default function AiChatSidebar() {
           className="card-header bg-dark text-white d-flex justify-content-between align-items-center px-3 py-2 cursor-pointer"
           style={{ height: '45px', userSelect: 'none' }}
           onClick={(e) => {
-            // Prevenir que el click en los botones dispare el minimizar
             if ((e.target as HTMLElement).closest('button')) return;
             setMinimizado(!minimizado);
           }}
@@ -107,7 +121,6 @@ export default function AiChatSidebar() {
           </div>
           
           <div className="d-flex gap-1">
-            {/* Botón para Expandir/Contraer ancho */}
             {!minimizado && (
               <button 
                 className="btn btn-sm text-white-50 p-1 border-0 hover-white" 
@@ -117,7 +130,6 @@ export default function AiChatSidebar() {
                 <i className={`bi ${expandido ? 'bi-arrows-angle-contract' : 'bi-arrows-angle-expand'}`}></i>
               </button>
             )}
-            {/* Botón para Minimizar chat */}
             <button 
               className="btn btn-sm text-white p-1 border-0"
               onClick={() => setMinimizado(!minimizado)}
@@ -130,7 +142,6 @@ export default function AiChatSidebar() {
         {/* CUERPO DEL CHAT */}
         <div className="d-flex flex-column" style={{ height: expandido ? '500px' : '400px', transition: 'height 0.3s' }}>
           
-          {/* Contenedor de Historial de Mensajes */}
           <div className="p-3 flex-grow-1 overflow-auto bg-light small" style={{ height: '100%' }}>
             {mensajes.map((msg, idx) => (
               <div 
@@ -147,34 +158,46 @@ export default function AiChatSidebar() {
                     whiteSpace: 'pre-line'
                   }}
                 >
-                  // Reemplaza la línea donde dice {msg.texto} dentro de tu map, por esto:
-
-                {/* Función auxiliar para renderizar negritas */}
-                {(() => {
-                  // Separa el texto usando una expresión regular para capturar lo que está entre ** **
-                  const partes = msg.texto.split(/(\*\*.*?\*\*)/g);
-                  return partes.map((parte, i) => {
-                    if (parte.startsWith('**') && parte.endsWith('**')) {
-                      // Le quita los asteriscos y lo envuelve en <strong>
-                      return <strong key={i}>{parte.slice(2, -2)}</strong>;
-                    }
-                    return <span key={i}>{parte}</span>;
-                  });
-                })()}
+                  {(() => {
+                    const partes = msg.texto.split(/(\*\*.*?\*\*)/g);
+                    return partes.map((parte, i) => {
+                      if (parte.startsWith('**') && parte.endsWith('**')) {
+                        return <strong key={i}>{parte.slice(2, -2)}</strong>;
+                      }
+                      return <span key={i}>{parte}</span>;
+                    });
+                  })()}
                 </div>
               </div>
             ))}
+
+            {/* UX: MOSTRAR BURBUJAS DE SUGERENCIAS SOLO SI ESTÁ EL MENSAJE INICIAL */}
+            {mensajes.length === 1 && !isTyping && (
+              <div className="mt-3 animate__animated animate__fadeIn">
+                <span className="text-muted d-block mb-2 font-monospace" style={{ fontSize: '10px' }}>💡 CONSULTAS RÁPIDAS SUGERIDAS:</span>
+                <div className="d-flex flex-column gap-2">
+                  {sugerenciasIniciales.map((sug, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => realizarConsultaChat(sug.query)}
+                      className="btn btn-sm btn-white text-start border shadow-sm p-2 bg-white burbuja-sugerencia text-secondary fw-medium transition-all"
+                      style={{ fontSize: '11px', borderRadius: '8px' }}
+                    >
+                      <i className="bi bi-chat-left-text me-2 text-primary"></i>
+                      {sug.titulo}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Animación de "Escribiendo..." */}
             {isTyping && (
               <div className="d-flex justify-content-start mb-3">
                 <div 
                   className="p-2 px-3 shadow-sm d-flex align-items-center" 
-                  style={{ 
-                    backgroundColor: '#ffffff', 
-                    borderRadius: '12px 12px 12px 0',
-                    height: '38px'
-                  }}
+                  style={{ backgroundColor: '#ffffff', borderRadius: '12px 12px 12px 0', height: '38px' }}
                 >
                   <div className="typing-indicator d-flex align-items-center">
                     <span></span><span></span><span></span>
@@ -191,7 +214,7 @@ export default function AiChatSidebar() {
             <input 
               type="text" 
               className="form-control form-control-sm border-0 bg-light"
-              placeholder="Ej: ¿Quién gana más de 800.000?"
+              placeholder={isTyping ? "Esperando respuesta..." : "Ej: ¿Cuántos contratos tiene Carmen Zuñiga?"}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={isTyping}
@@ -200,7 +223,7 @@ export default function AiChatSidebar() {
             <button 
               type="submit" 
               className="btn btn-sm btn-primary rounded-circle d-flex justify-content-center align-items-center"
-              style={{ width: '32px', height: '32px' }}
+              style={{ width: '32px', height: '32px', minWidth: '32px' }}
               disabled={isTyping || !input.trim()}
             >
               <i className="bi bi-send-fill" style={{ marginLeft: '-2px' }}></i>

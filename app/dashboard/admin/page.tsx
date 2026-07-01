@@ -38,6 +38,16 @@ export default function ConsolaAdministradorCompleta() {
   });
   const [guardandoParametros, setGuardandoParametros] = useState(false);
 
+  // --- NUEVOS ESTADOS PARA EL MODAL DE CONFIRMACIÓN DE ACCIONES ---
+  const [modalConfirmar, setModalConfirmar] = useState({
+    visible: false,
+    tipo: 'suspender' as 'suspender' | 'activar' | 'eliminar',
+    usuarioId: '',
+    usuarioEmail: ''
+  });
+  const [checkConsentimiento, setCheckConsentimiento] = useState(false); // UX para prevenir borrado accidental
+  const [procesandoAccion, setProcesandoAccion] = useState(false);
+
   const cargarDatosConsola = async () => {
     setLoading(true);
     try {
@@ -52,7 +62,6 @@ export default function ConsolaAdministradorCompleta() {
 
       const resLogs = await fetch('/api/admin/auditoria');
       if (resLogs.ok) setLogs(await resLogs.json());
-
     } catch (error) {
       console.error('Error al inicializar consola:', error);
     } finally {
@@ -79,40 +88,55 @@ export default function ConsolaAdministradorCompleta() {
     }
   };
 
-  const suspenderUsuario = async (id: string, estaSuspendido: boolean) => {
-    const accionTexto = estaSuspendido ? 'ACTIVAR' : 'SUSPENDER';
-    if (!window.confirm(`¿Deseas ${accionTexto} el acceso de este operador?`)) return;
-    try {
-      const res = await fetch('/api/admin/usuarios', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, accion: estaSuspendido ? 'activar' : 'suspender' })
-      });
-      if (res.ok) cargarDatosConsola();
-    } catch (error) { console.error(error); }
+  // UX: En lugar de disparar window.confirm, abrimos el modal estilizado
+  const abrirModalConfirmacion = (u: Usuario, tipo: 'suspender' | 'activar' | 'eliminar') => {
+    setCheckConsentimiento(false);
+    setModalConfirmar({
+      visible: true,
+      tipo,
+      usuarioId: u.id,
+      usuarioEmail: u.email
+    });
   };
 
-  const eliminarUsuario = async (id: string) => {
-    if (!window.confirm('🚨 ¡ALERTA CRÍTICA! ¿Eliminar este usuario definitivamente?')) return;
+  // Procesador unificado de acciones sobre usuarios
+  const ejecutarAccionUsuario = async () => {
+    const { tipo, usuarioId } = modalConfirmar;
+    setProcesandoAccion(true);
+
     try {
-      const res = await fetch('/api/admin/usuarios', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
-      });
-      if (res.ok) cargarDatosConsola();
-    } catch (error) { console.error(error); }
+      if (tipo === 'eliminar') {
+        const res = await fetch('/api/admin/usuarios', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: usuarioId })
+        });
+        if (res.ok) cargarDatosConsola();
+      } else {
+        const res = await fetch('/api/admin/usuarios', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            id: usuarioId, 
+            accion: tipo === 'activar' ? 'activar' : 'suspender' 
+          })
+        });
+        if (res.ok) cargarDatosConsola();
+      }
+      setModalConfirmar({ visible: false, tipo: 'suspender', usuarioId: '', usuarioEmail: '' });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setProcesandoAccion(false);
+    }
   };
 
-  // --- LÓGICA DE EXPORTACIÓN ---
   const generarArchivoCSV = (columnas: string[], filas: any[][], nombreArchivo: string) => {
-    const separador = ';'; // Compatible con Excel en español
+    const separador = ';';
     const contenido = [
       columnas.join(separador),
       ...filas.map(fila => fila.map(celda => `"${String(celda).replace(/"/g, '""')}"`).join(separador))
     ].join('\n');
-
-    // El \ufeff (BOM) asegura que Excel lea correctamente los acentos (UTF-8)
     const blob = new Blob(['\ufeff' + contenido], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -129,17 +153,8 @@ export default function ConsolaAdministradorCompleta() {
       const res = await fetch('/api/admin/exportar');
       if (!res.ok) throw new Error('Error al extraer datos');
       const data: Trabajador[] = await res.json();
-
       const columnas = ['RUT', 'DV', 'Nombres', 'Apellido Paterno', 'Apellido Materno', 'Total Contratos'];
-      const filas = data.map(t => [
-        t.rut,
-        t.dv,
-        t.nombres,
-        t.primer_apellido,
-        t.segundo_apellido || '',
-        t.contratos?.length || 0
-      ]);
-
+      const filas = data.map(t => [t.rut, t.dv, t.nombres, t.primer_apellido, t.segundo_apellido || '', t.contratos?.length || 0]);
       generarArchivoCSV(columnas, filas, `Reporte_Nomina_Completa_${new Date().toISOString().split('T')[0]}`);
     } catch (error) {
       alert('Hubo un error al exportar la nómina.');
@@ -154,30 +169,18 @@ export default function ConsolaAdministradorCompleta() {
       const res = await fetch('/api/admin/exportar');
       if (!res.ok) throw new Error('Error al extraer datos');
       const data: Trabajador[] = await res.json();
-
       const columnas = ['RUT', 'DV', 'Nombre Completo', 'Contratos Consecutivos', 'Tiene Vigente', 'Fecha Sugerida Retorno'];
       const filas: any[][] = [];
-
       data.forEach(t => {
-        // Utilizamos nuestra función centralizada con los parámetros actuales
         const analisis = evaluarAlertaContinuidad(t, parametros);
         if (analisis.califica) {
-          filas.push([
-            t.rut,
-            t.dv,
-            `${t.primer_apellido} ${t.segundo_apellido || ''} ${t.nombres}`.trim().toUpperCase(),
-            analisis.totalContratos,
-            analisis.tieneVigente ? 'SÍ' : 'NO',
-            analisis.fechaSugerida
-          ]);
+          filas.push([t.rut, t.dv, `${t.primer_apellido} ${t.segundo_apellido || ''} ${t.nombres}`.trim().toUpperCase(), analisis.totalContratos, analisis.tieneVigente ? 'SÍ' : 'NO', analisis.fechaSugerida]);
         }
       });
-
       if (filas.length === 0) {
         alert('No hay trabajadores en zona de alerta en este momento.');
         return;
       }
-
       generarArchivoCSV(columnas, filas, `Reporte_Alertas_Legales_${new Date().toISOString().split('T')[0]}`);
     } catch (error) {
       alert('Hubo un error al exportar las alertas.');
@@ -199,10 +202,7 @@ export default function ConsolaAdministradorCompleta() {
       </div>
 
       <div className="row g-4">
-        {/* COLUMNA IZQUIERDA: Parámetros y Exportaciones */}
         <div className="col-12 col-lg-4 d-flex flex-column gap-4">
-          
-          {/* PARÁMETROS */}
           <div className="card shadow-sm border-0 bg-white p-4">
             <h5 className="fw-bold text-secondary border-bottom pb-2 mb-3">Parámetros de Alerta</h5>
             <form onSubmit={handleGuardarParametros} className="d-flex flex-column gap-3">
@@ -220,36 +220,24 @@ export default function ConsolaAdministradorCompleta() {
             </form>
           </div>
 
-          {/* EXPORTACIONES */}
           <div className="card shadow-sm border-0 bg-white p-4">
             <h5 className="fw-bold text-secondary border-bottom pb-2 mb-3">
               <i className="bi bi-file-earmark-excel me-2 text-success"></i>Exportación de Datos
             </h5>
             <p className="text-muted small mb-3">Descarga la información en formato CSV compatible con Microsoft Excel.</p>
             <div className="d-flex flex-column gap-2">
-              <button 
-                className="btn btn-outline-success text-start fw-semibold" 
-                onClick={handleExportarNomina}
-                disabled={exportando}
-              >
+              <button className="btn btn-outline-success text-start fw-semibold" onClick={handleExportarNomina} disabled={exportando}>
                 <i className="bi bi-people me-2"></i>Descargar Nómina Completa
               </button>
-              <button 
-                className="btn btn-outline-danger text-start fw-semibold" 
-                onClick={handleExportarAlertas}
-                disabled={exportando}
-              >
+              <button className="btn btn-outline-danger text-start fw-semibold" onClick={handleExportarAlertas} disabled={exportando}>
                 <i className="bi bi-exclamation-triangle me-2"></i>Reporte Legal de Alertas
               </button>
             </div>
           </div>
-
         </div>
 
-        {/* COLUMNA DERECHA: Operadores y Auditoría */}
         <div className="col-12 col-lg-8 d-flex flex-column gap-4">
-          {/* NUEVO: FORMULARIO DE CREACIÓN DE OPERADOR */}
-          <div className="card shadow-sm border-0 bg-white p-4 mb-4">
+          <div className="card shadow-sm border-0 bg-white p-4">
             <h5 className="fw-bold text-secondary border-bottom pb-2 mb-3">
               <i className="bi bi-person-plus-fill me-2 text-primary"></i>Crear Nuevo Operador
             </h5>
@@ -267,9 +255,7 @@ export default function ConsolaAdministradorCompleta() {
                     body: JSON.stringify({ email, role })
                   });
                   const data = await res.json();
-                  
                   if (res.ok) {
-                    // Ya no mostramos la clave provisoria, solo el éxito
                     alert(`¡Invitación enviada exitosamente a ${email}!\n\nEl usuario recibirá un enlace seguro para acceder y crear su propia contraseña.`);
                     form.reset();
                     cargarDatosConsola(); 
@@ -296,7 +282,7 @@ export default function ConsolaAdministradorCompleta() {
               </div>
             </form>
           </div>
-          {/* OPERADORES */}
+
           <div className="card shadow-sm border-0 bg-white overflow-hidden">
             <div className="card-header bg-dark text-white fw-bold small py-3">
               <i className="bi bi-shield-lock me-2"></i>Operadores Institucionales
@@ -323,10 +309,18 @@ export default function ConsolaAdministradorCompleta() {
                           <td><span className={`badge ${u.user_metadata?.role === 'admin' ? 'bg-danger' : 'bg-secondary'}`}>{u.user_metadata?.role || 'USER'}</span></td>
                           <td>{suspendido ? <span className="badge bg-danger">Suspendido</span> : <span className="badge bg-success">Activo</span>}</td>
                           <td className="text-end px-3">
-                            <button onClick={() => suspenderUsuario(u.id, suspendido)} className={`btn btn-sm py-1 px-2 me-2 fw-bold ${suspendido ? 'btn-success' : 'btn-outline-warning'}`}>
+                            <button 
+                              onClick={() => abrirModalConfirmacion(u, suspendido ? 'activar' : 'suspender')} 
+                              className={`btn btn-sm py-1 px-2 me-2 fw-bold ${suspendido ? 'btn-success' : 'btn-outline-warning'}`}
+                              title={suspendido ? "Reactivar acceso" : "Suspender temporalmente"}
+                            >
                               <i className={`bi ${suspendido ? 'bi-play-fill' : 'bi-pause-fill'}`}></i>
                             </button>
-                            <button onClick={() => eliminarUsuario(u.id)} className="btn btn-sm btn-outline-danger py-1 px-2">
+                            <button 
+                              onClick={() => abrirModalConfirmacion(u, 'eliminar')} 
+                              className="btn btn-sm btn-outline-danger py-1 px-2"
+                              title="Eliminar definitivamente"
+                            >
                               <i className="bi bi-trash-fill"></i>
                             </button>
                           </td>
@@ -339,7 +333,6 @@ export default function ConsolaAdministradorCompleta() {
             </div>
           </div>
 
-          {/* AUDITORÍA */}
           <div className="card shadow-sm border-0 bg-white">
             <div className="card-header bg-secondary text-white fw-bold small">
               <i className="bi bi-journal-text me-2"></i>Historial de Auditoría
@@ -364,9 +357,96 @@ export default function ConsolaAdministradorCompleta() {
               </div>
             </div>
           </div>
-
         </div>
       </div>
+
+      {/* --- NUEVO: MODAL DE SEGURIDAD ESTILIZADO DE BOOTSTRAP 5 --- */}
+      {modalConfirmar.visible && (
+        <div className="modal show d-block animate__animated animate__fadeIn" tabIndex={-1} style={{ backgroundColor: 'rgba(33,37,41,0.6)', zIndex: 1060 }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg">
+              
+              <div className={`modal-header border-0 text-white ${
+                modalConfirmar.tipo === 'eliminar' ? 'bg-danger' : 'bg-dark'
+              }`}>
+                <h5 className="modal-title fw-bold">
+                  <i className={`bi me-2 ${
+                    modalConfirmar.tipo === 'eliminar' ? 'bi-exclamation-octagon-fill' : 'bi-shield-exclamation'
+                  }`}></i>
+                  {modalConfirmar.tipo === 'eliminar' && 'Confirmación de Eliminación Crítica'}
+                  {modalConfirmar.tipo === 'suspender' && 'Confirmación de Suspensión de Operador'}
+                  {modalConfirmar.tipo === 'activar' && 'Confirmación de Reactivación de Cuenta'}
+                </h5>
+                <button 
+                  type="button" 
+                  className="btn-close btn-close-white" 
+                  onClick={() => setModalConfirmar(prev => ({ ...prev, visible: false }))}
+                  disabled={procesandoAccion}
+                ></button>
+              </div>
+
+              <div className="modal-body p-4">
+                <p className="text-secondary small mb-3">Estás a punto de modificar el estado de la siguiente credencial del sistema:</p>
+                <div className="bg-light p-3 rounded mb-3 font-monospace small border">
+                  <strong>Email:</strong> {modalConfirmar.usuarioEmail} <br />
+                  <strong>ID Técnico:</strong> {modalConfirmar.usuarioId}
+                </div>
+
+                {/* FLUJO CONDICIONAL SEGÚN LA ACCIÓN */}
+                {modalConfirmar.tipo === 'eliminar' ? (
+                  <div className="alert alert-danger p-2 px-3 small border-0 m-0">
+                    <i className="bi bi-info-circle-fill me-2"></i>
+                    Esta acción es irreversible y removerá al operador permanentemente.
+                  </div>
+                ) : modalConfirmar.tipo === 'suspender' ? (
+                  <p className="small text-muted m-0">El usuario no podrá iniciar sesión ni realizar consultas en la base de datos hasta que un administrador levante el bloqueo.</p>
+                ) : (
+                  <p className="small text-muted m-0">Se restaurará el acceso de forma inmediata a los paneles del dashboard contractual.</p>
+                )}
+
+                {/* UX CRÍTICA: Checkbox de consentimiento antes de permitir el clic destructivo */}
+                {modalConfirmar.tipo === 'eliminar' && (
+                  <div className="form-check mt-3 border-top pt-3">
+                    <input 
+                      className="form-check-input cursor-pointer" 
+                      type="checkbox" 
+                      id="checkConsentimiento" 
+                      checked={checkConsentimiento}
+                      onChange={(e) => setCheckConsentimiento(e.target.checked)}
+                    />
+                    <label className="form-check-label small fw-bold text-danger cursor-pointer" htmlFor="checkConsentimiento">
+                      Comprendo las consecuencias y deseo eliminar definitivamente esta cuenta.
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer border-0 bg-light py-2">
+                <button 
+                  type="button" 
+                  className="btn btn-sm btn-outline-secondary px-3" 
+                  onClick={() => setModalConfirmar(prev => ({ ...prev, visible: false }))}
+                  disabled={procesandoAccion}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button" 
+                  className={`btn btn-sm fw-bold px-4 ${
+                    modalConfirmar.tipo === 'eliminar' ? 'btn-danger' : 'btn-dark'
+                  }`}
+                  onClick={ejecutarAccionUsuario}
+                  disabled={procesandoAccion || (modalConfirmar.tipo === 'eliminar' && !checkConsentimiento)}
+                >
+                  {procesandoAccion ? 'Procesando...' : 'Confirmar Acción'}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

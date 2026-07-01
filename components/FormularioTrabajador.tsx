@@ -1,106 +1,109 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import toast from 'react-hot-toast'; // <-- Implementamos react-hot-toast
+import { toast } from 'react-hot-toast';
 
 export default function FormularioTrabajador() {
-  // Estado para el RUT limpio (para la BD) y formateado (para la vista)
-  const [rutRaw, setRutRaw] = useState('');
-  const [rutDisplay, setRutDisplay] = useState('');
+  // 1. Estados de Identidad
+  const [rut, setRut] = useState('');
   const [dv, setDv] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  // Campos de Texto
   const [nombres, setNombres] = useState('');
   const [primerApellido, setPrimerApellido] = useState('');
   const [segundoApellido, setSegundoApellido] = useState('');
   
-  // Campos del Contrato
-  const [jornada, setJornada] = useState('44'); // Lo actualicé a 44 hrs por ser el estándar actual
+  // 2. Estados de Estructura Contractual
+  const [jornada, setJornada] = useState('44');
   const [sueldoBase, setSueldoBase] = useState('');
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaTermino, setFechaTermino] = useState('');
 
-  // Estado para bloquear/desbloquear dinámicamente los campos de identidad
+  // Estados de control UX
+  const [buscandoRut, setBuscandoRut] = useState(false);
   const [existeTrabajador, setExisteTrabajador] = useState(false);
+  const [bloqueado, setBloqueado] = useState(false);
+  const [mostrarContrato, setMostrarContrato] = useState(false); 
+  const [loading, setLoading] = useState(false);
 
-  // Calcular DV Chileno automáticamente
-  const calcularDV = (rutAux: string) => {
-    let M = 0, S = 1;
-    let T = parseInt(rutAux);
-    for (; T; T = Math.floor(T / 10)) {
-      S = (S + (T % 10) * (9 - (M++ % 6))) % 11;
+  const calcularDV = (rutAncho: string) => {
+    const cuerpo = rutAncho.replace(/[^0-9]/g, '');
+    if (!cuerpo) return '';
+    let suma = 0;
+    let multiplicador = 2;
+    for (let i = cuerpo.length - 1; i >= 0; i--) {
+      suma += multiplicador * parseInt(cuerpo.charAt(i));
+      multiplicador = multiplicador === 7 ? 2 : multiplicador + 1;
     }
-    return S ? (S - 1).toString() : 'K';
+    const resto = suma % 11;
+    const dvCalculado = 11 - resto;
+    if (dvCalculado === 11) return '0';
+    if (dvCalculado === 10) return 'K';
+    return dvCalculado.toString();
   };
 
-  // Formatear RUT con puntos mientras el usuario escribe
-  const handleRutChange = (valor: string) => {
-    // 1. Extraer solo números
-    const soloNumeros = valor.replace(/[^0-9]/g, '');
-    setRutRaw(soloNumeros);
+  // UX: Monitor dinámico del RUT con debounce
+  useEffect(() => {
+    const cuerpoRut = rut.replace(/[^0-9]/g, '');
+    
+    if (cuerpoRut.length >= 7) {
+      const dvCalculado = calcularDV(cuerpoRut);
+      setDv(dvCalculado);
 
-    // 2. Aplicar separador de miles (Puntos)
-    if (soloNumeros) {
-      const formateado = parseInt(soloNumeros, 10).toLocaleString('es-CL');
-      setRutDisplay(formateado);
+      setBuscandoRut(true);
+      const timer = setTimeout(async () => {
+        const { data, error } = await supabase
+          .from('trabajadores')
+          .select('nombres, primer_apellido, segundo_apellido')
+          .eq('rut', parseInt(cuerpoRut))
+          .single();
+
+        if (!error && data) {
+          setNombres(data.nombres);
+          setPrimerApellido(data.primer_apellido);
+          setSegundoApellido(data.segundo_apellido || '');
+          setExisteTrabajador(true);
+          setBloqueado(true);
+          toast.success('Funcionario verificado. Listo para anexar contrato.', { id: 'rut-check' });
+        } else {
+          if (bloqueado) {
+            setNombres('');
+            setPrimerApellido('');
+            setSegundoApellido('');
+          }
+          setExisteTrabajador(false);
+          setBloqueado(false);
+          setMostrarContrato(false);
+        }
+        setBuscandoRut(false);
+      }, 400);
+
+      return () => clearTimeout(timer);
     } else {
-      setRutDisplay('');
+      setDv('');
+      setBuscandoRut(false);
     }
-  };
+  }, [rut]);
 
   const handleLimpiarFormulario = () => {
-    setRutRaw('');
-    setRutDisplay('');
+    setRut('');
     setDv('');
     setNombres('');
     setPrimerApellido('');
     setSegundoApellido('');
+    setJornada('44');
     setSueldoBase('');
     setFechaInicio('');
     setFechaTermino('');
-    setJornada('44');
     setExisteTrabajador(false);
+    setBloqueado(false);
+    setMostrarContrato(false);
+    toast.dismiss();
   };
 
-  // Buscar si el trabajador ya existe al salir del campo (onBlur)
-  const handleRutBlur = async () => {
-    if (!rutRaw) return;
-
-    // Calcular y asignar DV en tiempo real
-    const dvCalculado = calcularDV(rutRaw);
-    setDv(dvCalculado);
-
-    const toastId = toast.loading('Buscando registro en el sistema...');
-
-    // Buscar en Supabase
-    const { data: trabajador, error } = await supabase
-      .from('trabajadores')
-      .select('*')
-      .eq('rut', parseInt(rutRaw))
-      .single();
-
-    if (trabajador && !error) {
-      setNombres(trabajador.nombres);
-      setPrimerApellido(trabajador.primer_apellido);
-      setSegundoApellido(trabajador.segundo_apellido || '');
-      setExisteTrabajador(true);
-      
-      toast.success('Funcionario encontrado. Datos de identidad bloqueados.', { id: toastId });
-    } else {
-      setNombres('');
-      setPrimerApellido('');
-      setSegundoApellido('');
-      setExisteTrabajador(false);
-      
-      toast.dismiss(toastId); // Solo quitamos el estado de carga si es nuevo
-    }
-  };
-
-  // Guardar el Formulario
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Guardar definitivo en base de datos
+  const handleGuardarFormulario = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    const cuerpoRut = parseInt(rut.replace(/[^0-9]/g, ''));
+
     if (!fechaInicio) {
       toast.error('La fecha de inicio es obligatoria.');
       return;
@@ -112,14 +115,14 @@ export default function FormularioTrabajador() {
     }
 
     setLoading(true);
-    const toastId = toast.loading('Procesando registro...');
+    const toastId = toast.loading('Procesando registro contractual...');
 
     try {
-      // 1. Consultar traslapes de contratos
+      // 1. Consultar e impedir traslapes de contratos de este funcionario
       const { data: contratosExistentes, error: errBusqueda } = await supabase
         .from('contratos')
         .select('fecha_inicio, fecha_termino')
-        .eq('trabajador_rut', parseInt(rutRaw));
+        .eq('trabajador_rut', cuerpoRut);
 
       if (!errBusqueda && contratosExistentes && contratosExistentes.length > 0) {
         const inicioNuevo = new Date(fechaInicio);
@@ -138,20 +141,21 @@ export default function FormularioTrabajador() {
         }
       }
 
-      // 2. Guardar Identidad
-      const { error: errTrabajador } = await supabase.from('trabajadores').upsert({
-        rut: parseInt(rutRaw),
-        dv: dv.toUpperCase(),
-        nombres: nombres.toUpperCase().trim(),
-        primer_apellido: primerApellido.toUpperCase().trim(),
-        segundo_apellido: segundoApellido ? segundoApellido.toUpperCase().trim() : null
-      });
+      // 2. Si el trabajador es completamente nuevo, registrar su identidad primero
+      if (!existeTrabajador) {
+        const { error: errTrabajador } = await supabase.from('trabajadores').insert({
+          rut: cuerpoRut,
+          dv: dv.toUpperCase(),
+          nombres: nombres.toUpperCase().trim(),
+          primer_apellido: primerApellido.toUpperCase().trim(),
+          segundo_apellido: segundoApellido ? segundoApellido.toUpperCase().trim() : null
+        });
+        if (errTrabajador) throw errTrabajador;
+      }
 
-      if (errTrabajador) throw errTrabajador;
-
-      // 3. Insertar Contrato
+      // 3. Insertar los términos del Contrato
       const { error: errContrato } = await supabase.from('contratos').insert({
-        trabajador_rut: parseInt(rutRaw),
+        trabajador_rut: cuerpoRut,
         jornada: parseInt(jornada),
         sueldo_base: parseFloat(sueldoBase),
         fecha_inicio: fechaInicio,
@@ -160,11 +164,11 @@ export default function FormularioTrabajador() {
 
       if (errContrato) throw errContrato;
 
-      toast.success('¡Ficha contractual e identidad guardadas exitosamente!', { id: toastId });
+      toast.success('¡Ficha contractual guardada exitosamente!', { id: toastId });
       handleLimpiarFormulario();
       
     } catch (error: any) {
-      toast.error(`Error al guardar: ${error.message}`, { id: toastId });
+      toast.error(`Error al procesar: ${error.message}`, { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -176,157 +180,186 @@ export default function FormularioTrabajador() {
         <i className="bi bi-person-lines-fill me-2 fs-5"></i> Formulario de Personal y Contratos
       </div>
       
-      <form onSubmit={handleSubmit} className="card-body p-4 p-md-5">
+      <div className="card-body p-4 p-md-5">
         
-        {/* Notificación visual de trabajador existente */}
-        {existeTrabajador && (
-          <div className="alert alert-info py-2 d-flex align-items-center small shadow-sm mb-4">
-            <i className="bi bi-info-circle-fill me-2 fs-5"></i>
-            <div>
-              <strong>Funcionario Vinculado:</strong> Los datos de identidad están bloqueados para evitar alteraciones accidentales. Solo se agregará un nuevo registro al historial de contratos.
-            </div>
-          </div>
-        )}
-
+        {/* SECCIÓN 1: IDENTIDAD */}
         <h6 className="text-secondary border-bottom pb-2 mb-4 fw-bold text-uppercase d-flex align-items-center">
           <span className="bg-primary text-white rounded-circle d-inline-flex justify-content-center align-items-center me-2" style={{ width: '24px', height: '24px', fontSize: '12px' }}>1</span>
           Datos de Identidad
         </h6>
         
-        <div className="row g-3 mb-5">
-          {/* Campo RUT (Ahora formateado) */}
+        <div className="row g-3 mb-4">
           <div className="col-8 col-md-4">
             <label className="form-label small fw-bold text-secondary">RUT (Solo números)</label>
             <input
               type="text"
-              className="form-control"
-              placeholder="Ej: 12.345.678"
-              value={rutDisplay}
-              onChange={(e) => handleRutChange(e.target.value)}
-              onBlur={handleRutBlur}
+              className={`form-control ${bloqueado ? 'border-success bg-light fw-bold' : ''}`}
+              placeholder="Ej: 19496016"
+              value={rut}
+              onChange={(e) => setRut(e.target.value)}
+              disabled={bloqueado}
               required
             />
           </div>
-
-          {/* Campo DV */}
           <div className="col-4 col-md-2">
             <label className="form-label small fw-bold text-secondary">DV</label>
-            <input
-              type="text"
-              className="form-control fw-bold text-center bg-light"
-              value={dv}
-              readOnly
-              tabIndex={-1}
-            />
-          </div>
-
-          {/* Campo Nombres */}
-          <div className="col-md-6">
-            <label className="form-label small fw-bold text-secondary d-flex justify-content-between">
-              Nombres 
-              {existeTrabajador && <i className="bi bi-lock-fill text-warning" title="Dato bloqueado por el sistema"></i>}
-            </label>
-            <input
-              type="text"
-              className={`form-control ${existeTrabajador ? 'bg-light text-muted border-warning text-uppercase fw-semibold' : 'text-uppercase'}`}
-              placeholder="NOMBRES"
-              value={nombres}
-              onChange={(e) => setNombres(e.target.value)}
-              readOnly={existeTrabajador}
-              required
-            />
-          </div>
-
-          {/* Campo Primer Apellido */}
-          <div className="col-md-6">
-            <label className="form-label small fw-bold text-secondary d-flex justify-content-between">
-              Primer Apellido
-              {existeTrabajador && <i className="bi bi-lock-fill text-warning"></i>}
-            </label>
-            <input
-              type="text"
-              className={`form-control ${existeTrabajador ? 'bg-light text-muted border-warning text-uppercase fw-semibold' : 'text-uppercase'}`}
-              placeholder="APELLIDO PATERNO"
-              value={primerApellido}
-              onChange={(e) => setPrimerApellido(e.target.value)}
-              readOnly={existeTrabajador}
-              required
-            />
-          </div>
-
-          {/* Campo Segundo Apellido */}
-          <div className="col-md-6">
-            <label className="form-label small fw-bold text-secondary d-flex justify-content-between">
-              Segundo Apellido
-              {existeTrabajador && <i className="bi bi-lock-fill text-warning"></i>}
-            </label>
-            <input
-              type="text"
-              className={`form-control ${existeTrabajador ? 'bg-light text-muted border-warning text-uppercase fw-semibold' : 'text-uppercase'}`}
-              placeholder="APELLIDO MATERNO"
-              value={segundoApellido}
-              onChange={(e) => setSegundoApellido(e.target.value)}
-              readOnly={existeTrabajador}
-            />
-          </div>
-        </div>
-
-        <h6 className="text-secondary border-bottom pb-2 mb-4 fw-bold text-uppercase d-flex align-items-center">
-          <span className="bg-primary text-white rounded-circle d-inline-flex justify-content-center align-items-center me-2" style={{ width: '24px', height: '24px', fontSize: '12px' }}>2</span>
-          Estructura Contractual
-        </h6>
-        
-        <div className="row g-3 mb-5">
-          <div className="col-md-3">
-            <label className="form-label small fw-semibold">Jornada Semanal</label>
             <div className="input-group">
-              <input type="number" className="form-control" value={jornada} onChange={(e) => setJornada(e.target.value)} required />
-              <span className="input-group-text bg-light text-muted">Hrs.</span>
+              <span className="input-group-text bg-light fw-bold w-100 justify-content-center" style={{ height: '38px' }}>
+                {buscandoRut ? <span className="spinner-border spinner-border-sm text-primary" role="status"></span> : (dv || '-')}
+              </span>
             </div>
           </div>
-          
-          <div className="col-md-4">
-            <label className="form-label small fw-semibold">Sueldo Base Bruto</label>
-            <div className="input-group">
-              <span className="input-group-text bg-light text-muted">$</span>
-              <input type="number" className="form-control" placeholder="650000" value={sueldoBase} onChange={(e) => setSueldoBase(e.target.value)} required />
-            </div>
-          </div>
-          
-          <div className="col-md-5 d-none d-md-block"></div> {/* Espaciador para la grilla */}
-
-          <div className="col-md-4">
-            <label className="form-label small fw-semibold">Fecha de Inicio</label>
-            <input type="date" className="form-control" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required />
-          </div>
-          
-          <div className="col-md-4">
-            <label className="form-label small fw-semibold">Fecha de Término</label>
-            <input type="date" className="form-control" value={fechaTermino} onChange={(e) => setFechaTermino(e.target.value)} />
-            <div className="form-text" style={{ fontSize: '0.75rem' }}>Dejar vacío si es indefinido.</div>
-          </div>
-        </div>
-
-        {/* ACCIONES */}
-        <div className="d-flex flex-column flex-sm-row gap-3 pt-3 border-top">
-          <button type="submit" className="btn btn-success px-4 py-2 fw-bold" disabled={loading || !rutRaw}>
-            {loading ? (
-              <><span className="spinner-border spinner-border-sm me-2"></span> Registrando...</>
-            ) : (
-              <><i className="bi bi-save-fill me-2"></i> Guardar Ficha Contractual</>
+          <div className="col-md-6 d-flex align-items-end">
+            {bloqueado && (
+              <button type="button" className="btn btn-outline-danger fw-semibold px-3 w-100 w-md-auto" onClick={handleLimpiarFormulario}>
+                <i className="bi bi-arrow-counterclockwise me-1"></i> Cambiar RUT o Funcionario
+              </button>
             )}
-          </button>
-          
-          <button 
-            type="button" 
-            className="btn btn-outline-secondary px-4 py-2 fw-semibold" 
-            onClick={handleLimpiarFormulario}
-            disabled={loading}
-          >
-            <i className="bi bi-eraser-fill me-2"></i> Limpiar Campos
-          </button>
+          </div>
+
+          {bloqueado && (
+            <div className="col-12 my-2 animate__animated animate__fadeIn">
+              <div className="alert alert-info border-0 shadow-sm d-flex align-items-center m-0 py-2 px-3 small">
+                <i className="bi bi-shield-lock-fill text-info fs-5 me-2"></i>
+                <div>
+                  <strong>Funcionario Vinculado:</strong> Los datos de identidad están resguardados en el archivo maestro. Presiona <u>Continuar con Contrato</u> para abrir la sección contractual.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* CAMPO: NOMBRES */}
+          <div className="col-md-6">
+            <label className="form-label small fw-bold text-secondary">Nombres</label>
+            <div className="input-group">
+              {bloqueado && (
+                <span className="input-group-text bg-light text-muted border-end-0">
+                  <i className="bi bi-lock-fill"></i>
+                </span>
+              )}
+              <input 
+                type="text" 
+                className={`form-control text-uppercase ${bloqueado ? 'bg-light text-muted border-start-0' : ''}`} 
+                value={nombres} 
+                onChange={(e) => setNombres(e.target.value)} 
+                readOnly={bloqueado} 
+                required 
+              />
+            </div>
+          </div>
+
+          {/* CAMPO: APELLIDO PATERNO */}
+          <div className="col-md-6">
+            <label className="form-label small fw-bold text-secondary">Apellido Paterno</label>
+            <div className="input-group">
+              {bloqueado && (
+                <span className="input-group-text bg-light text-muted border-end-0">
+                  <i className="bi bi-lock-fill"></i>
+                </span>
+              )}
+              <input 
+                type="text" 
+                className={`form-control text-uppercase ${bloqueado ? 'bg-light text-muted border-start-0' : ''}`} 
+                value={primerApellido} 
+                onChange={(e) => setPrimerApellido(e.target.value)} 
+                readOnly={bloqueado} 
+                required 
+              />
+            </div>
+          </div>
+
+          {/* CAMPO: APELLIDO MATERNO */}
+          <div className="col-md-6">
+            <label className="form-label small fw-bold text-secondary">Apellido Materno</label>
+            <div className="input-group">
+              {bloqueado && (
+                <span className="input-group-text bg-light text-muted border-end-0">
+                  <i className="bi bi-lock-fill"></i>
+                </span>
+              )}
+              <input 
+                type="text" 
+                className={`form-control text-uppercase ${bloqueado ? 'bg-light text-muted border-start-0' : ''}`} 
+                value={segundoApellido} 
+                onChange={(e) => setSegundoApellido(e.target.value)} 
+                readOnly={bloqueado} 
+              />
+            </div>
+          </div>
         </div>
-      </form>
+
+        {/* CONTROL DE FLUJO DINÁMICO (UX) */}
+        {!mostrarContrato && (
+          <div className="d-flex justify-content-end gap-2 pt-3 border-top">
+            <button type="button" className="btn btn-outline-secondary px-4 small" onClick={handleLimpiarFormulario}>Limpiar Todo</button>
+            <button 
+              type="button" 
+              className="btn btn-primary px-4 fw-bold"
+              disabled={!rut || buscandoRut}
+              onClick={() => {
+                setMostrarContrato(true);
+                toast.success('Estructura contractual desplegada.');
+              }}
+            >
+              {existeTrabajador ? 'Continuar con Contrato →' : 'Configurar Contrato →'}
+            </button>
+          </div>
+        )}
+
+        {/* SECCIÓN 2: ESTRUCTURA CONTRACTUAL */}
+        {mostrarContrato && (
+          <form onSubmit={handleGuardarFormulario} className="animate__animated animate__fadeIn mt-5">
+            <h6 className="text-secondary border-bottom pb-2 mb-4 fw-bold text-uppercase d-flex align-items-center">
+              <span className="bg-primary text-white rounded-circle d-inline-flex justify-content-center align-items-center me-2" style={{ width: '24px', height: '24px', fontSize: '12px' }}>2</span>
+              Estructura Contractual
+            </h6>
+            
+            <div className="row g-3 mb-4">
+              <div className="col-md-3">
+                <label className="form-label small fw-semibold">Jornada Semanal</label>
+                <div className="input-group">
+                  <input type="number" className="form-control" value={jornada} onChange={(e) => setJornada(e.target.value)} required />
+                  <span className="input-group-text bg-light text-muted">Hrs.</span>
+                </div>
+              </div>
+              
+              <div className="col-md-4">
+                <label className="form-label small fw-semibold">Sueldo Base Bruto</label>
+                <div className="input-group">
+                  <span className="input-group-text bg-light text-muted">$</span>
+                  <input type="number" className="form-control" placeholder="650000" value={sueldoBase} onChange={(e) => setSueldoBase(e.target.value)} required />
+                </div>
+              </div>
+              
+              <div className="col-md-5 d-none d-md-block"></div>
+
+              <div className="col-md-4">
+                <label className="form-label small fw-semibold">Fecha de Inicio</label>
+                <input type="date" className="form-control" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required />
+              </div>
+              
+              <div className="col-md-4">
+                <label className="form-label small fw-semibold">Fecha de Término</label>
+                <input type="date" className="form-control" value={fechaTermino} onChange={(e) => setFechaTermino(e.target.value)} />
+                <div className="form-text" style={{ fontSize: '0.75rem' }}>Dejar vacío si es indefinido.</div>
+              </div>
+            </div>
+
+            <div className="d-flex flex-column flex-sm-row gap-3 pt-3 border-top">
+              <button type="submit" className="btn btn-success px-4 py-2 fw-bold" disabled={loading}>
+                {loading ? (
+                  <><span className="spinner-border spinner-border-sm me-2"></span> Registrando...</>
+                ) : (
+                  <><i className="bi bi-save-fill me-2"></i> Guardar Historial Contractual</>
+                )}
+              </button>
+              <button type="button" className="btn btn-outline-secondary px-4 py-2 fw-semibold" onClick={() => setMostrarContrato(false)} disabled={loading}>
+                ← Volver a Identidad
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
