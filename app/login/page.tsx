@@ -42,8 +42,6 @@ export default function LoginPage() {
     setSuccessMsg('');
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      // Esta es la URL a la que Supabase enviará al usuario cuando haga clic en el correo.
-      // Next.js capturará ese token y le permitirá al operador cambiar la contraseña.
       redirectTo: `${window.location.origin}/api/auth/callback?next=/dashboard/actualizar-password`,
     });
 

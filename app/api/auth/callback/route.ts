@@ -6,7 +6,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams, origin } = new URL(req.url);
     const code = searchParams.get('code');
-    const next = searchParams.get('next') || '/dashboard/trabajadores';
+    const next = searchParams.get('next') || '/';
 
     if (code) {
       const supabase = createClient(
