@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
+import { redirect } from 'next/navigation';
 
 export default function LoginPage() {
   // Controles del formulario estándar
@@ -13,8 +13,6 @@ export default function LoginPage() {
   const [vista, setVista] = useState<'login' | 'recuperar'>('login'); // Controla qué formulario se muestra
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState(''); // Mensaje cuando el correo se envía con éxito
-
-  const router = useRouter();
 
   // Handler 1: Manejar el Inicio de Sesión Estándar
   const handleLogin = async (e: React.SubmitEvent<HTMLFormElement>) => {
@@ -32,8 +30,7 @@ export default function LoginPage() {
       setErrorMsg('Credenciales inválidas. Inténtalo de nuevo.');
       setLoading(false);
     } else {
-      router.push('/dashboard/trabajadores');
-      router.refresh();
+      redirect('dashboard/trabajadores');
     }
   };
 

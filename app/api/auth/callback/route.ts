@@ -19,7 +19,7 @@ export async function GET(req: Request) {
       if (!error && data.session) {
         const response = NextResponse.redirect(`${origin}${next}`);
         const cookieStore = await cookies();
-        
+
         cookieStore.set('sb-access-token', data.session.access_token, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
@@ -36,7 +36,5 @@ export async function GET(req: Request) {
   } catch (err) {
     console.error('Fallo crítico en el callback de autenticación:', err);
   }
-
-  // Si algo falla o no hay código válido, redirige al login con bandera de error
   return NextResponse.redirect(`${new URL(req.url).origin}/login?error=callback-failed`);
 }

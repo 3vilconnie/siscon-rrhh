@@ -2,14 +2,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Inicializamos el cliente de Supabase con permisos de Service Role (Admin)
-// NUNCA expongas la SUPABASE_SERVICE_ROLE_KEY en el cliente
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// OBTENER LISTA DE USUARIOS
+
 export async function GET() {
   try {
     const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
@@ -22,17 +21,13 @@ export async function GET() {
   }
 }
 
-// CREAR NUEVO USUARIO (Vía Invitación Segura)
 export async function POST(request: Request) {
   try {
-    const { email, role } = await request.json();
-
-    // 1. Enviamos la invitación (sin pasar data de roles aquí para evitar el user_metadata)
+    const { email, role } = await request.json();   
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
 
     if (error) throw error;
 
-    // 2. 🛡️ Inmediatamente después, aseguramos el rol en app_metadata
     if (data.user) {
       await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
         app_metadata: { role: role || 'usuario' }
@@ -103,7 +98,6 @@ export async function DELETE(request: Request) {
     const { data, error } = await supabaseAdmin.auth.admin.deleteUser(id);
     if (error) throw error;
 
-    // 🔴 NUEVO: Registrar en Auditoría
     await supabaseAdmin.from('auditoria').insert({
       actor: 'Administrador',
       accion: 'ELIMINAR_USUARIO',
