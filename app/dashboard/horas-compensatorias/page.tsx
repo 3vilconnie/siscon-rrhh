@@ -196,9 +196,15 @@ export default function HorasCompensatoriasPage() {
           fecha: fechaInput,
           horas_solicitadas: horasNum
         });
-
-      if (errInsert) throw errInsert;
-
+      
+      if (errInsert) {
+        if (errInsert.message.includes('la fecha seleccionada ya tiene un registro')) {
+          toast.error('La fecha seleccionada ya tiene un registro', { id: toastId });
+        } else {
+          toast.error(`Error al registrar: ${errInsert.message}`, { id: toastId });
+        }
+        return; 
+      }
       toast.success('Horas compensatorias descontadas exitosamente.', { id: toastId });
       
       reiniciarFormularioCompleto();
