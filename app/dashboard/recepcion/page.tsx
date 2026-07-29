@@ -1,8 +1,11 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
 import { Trabajador, DetalleDocumento} from "@/types";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import logoGobierno from "@/app/assets/logoconaf.png";
 
 
 export default function ModuloRecepcionDocumentos() {
@@ -12,6 +15,7 @@ export default function ModuloRecepcionDocumentos() {
   const [loading, setLoading] = useState(true);
   const [baseDatosTrabajadores, setBaseDatosTrabajadores] = useState<Trabajador[]>([]);
   const [fechaRecepcion, setFechaRecepcion] = useState(new Date().toISOString().split('T')[0]);
+  const pdfRef = useRef<HTMLDivElement>(null);
 
   // Estado para manejar las filas de la tabla dinámicamente
   const [detalles, setDetalles] = useState<DetalleDocumento[]>([
@@ -62,11 +66,16 @@ export default function ModuloRecepcionDocumentos() {
 
   }
 
+  const eliminarFila = (id : number) => {
+    const nuevoDetalles = detalles.filter(d => d.id != id);
+
+    setDetalles(nuevoDetalles);
+    toast.success(`Fila eliminada.`);
+  };
+
   // Función que busca al trabajador cuando el usuario sale del input de RUT
   const buscarTrabajador = (index: number) => {
-    const rutBuscado = detalles[index].rut.replace(/\./g, ''); // Quitamos puntos por si acaso
-
-    console.log(rutBuscado);
+    const rutBuscado = detalles[index].rut.replace(/\./g, ''); 
 
     if (!rutBuscado) return;
 
@@ -83,10 +92,40 @@ export default function ModuloRecepcionDocumentos() {
         genero: trabajadorEncontrado.genero ?? "S/R",
         dv: trabajadorEncontrado.dv
       };
-      console.table(detalles);
-      console.log("------------");
-      console.table(nuevosDetalles);
+
       setDetalles(nuevosDetalles);
+    }else{
+      toast.error("Trabajador no encontrado.");
+    }
+  };
+
+  const generarPDF = async () => {
+    const elemento = pdfRef.current;
+    if (!elemento) return;
+
+    try {
+      // Configuramos html2canvas para capturar con buena calidad (scale: 2)
+      const canvas = await html2canvas(elemento, {
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Creamos el documento en formato A4 vertical ('p')
+      const pdf = new jsPDF('p', 'mm', 'letter');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      // Agregamos la imagen generada al PDF
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      
+      // Descargamos el archivo
+      pdf.save('Recepcion_Documentos.pdf');
+      toast.success("Documento generado con éxito.");
+    } catch (error) {
+      toast.error("Hubo un error al generar el PDF");
     }
   };
 
@@ -99,8 +138,18 @@ export default function ModuloRecepcionDocumentos() {
   return (
     <div className="container my-5">
       <div className="card shadow-sm border-0">
-        <div className="card-body p-4 p-md-5">
-          <h2 className="text-center fw-bold mb-5">Formulario Recepción de Documentos</h2>
+        <div className="card-body p-4 p-md-5" ref={pdfRef} style={{ minHeight: '297mm' }}>
+          <div className="row mb-5">
+            <header>
+              <img src={logoGobierno.src} style={{width:"8.59cm"}} /> <br/>
+              CORPORACION NACIONAL FORESTAL <br/>
+              REGIÓN DE ARICA Y PARINACOTA <br/>
+              DEPTO. FINANZAS Y ADMINISTRACIÓN <br/>
+              SECCIÓN RECURSOS HUMANOS <br/>
+              CDC/JAN/crh 
+            </header>
+          </div>
+          <h3 className="text-center fw-bold mb-5">Formulario Recepción de Documentos</h3>
 
           {/* SECCIÓN 1: Tipos de Documentos e Información General */}
           <div className="row mb-5 pb-4 border-bottom">
@@ -150,10 +199,14 @@ export default function ModuloRecepcionDocumentos() {
           </div>
 
           {/* SECCIÓN 2: Detalle de los Documentos (Tabla) */}
-          <div className="mb-5 pb-4 border-bottom">
+          <div className="mb-5 pb-4 border-bottom w-100">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h5 className="fw-semibold m-0">Detalle</h5>
-              <button type="button" onClick={agregarFila} className="btn btn-primary btn-sm px-3 shadow-sm">
+              <button type="button" 
+              onClick={agregarFila} 
+              className="btn btn-primary btn-sm px-3 shadow-sm"
+              data-html2canvas-ignore="true"
+              >
                 + Añadir Fila
               </button>
             </div>
@@ -161,18 +214,19 @@ export default function ModuloRecepcionDocumentos() {
               <table className="table table-bordered table-hover align-middle text-nowrap mb-0">
                 <thead style={{ backgroundColor: '#8b0000', color: 'white' }}>
                   <tr>
-                    <th className="py-2 fw-normal">FECHA_EMIS</th>
-                    <th className="py-2 fw-normal">CABECERA</th>
+                    <th className="py-2 fw-normal">FECHA EMISIÓN</th>
+                    <th className="py-2 fw-normal">PROGRAMA</th>
                     <th className="py-2 fw-normal">RUT</th>
                     <th className="py-2 fw-normal text-center">DV</th>
                     <th className="py-2 fw-normal">NOMBRE</th>
-                    <th className="py-2 fw-normal">APELLIDO P</th>
-                    <th className="py-2 fw-normal">APELLIDO M</th>
+                    <th className="py-2 fw-normal">APELLIDO PATERNO</th>
+                    <th className="py-2 fw-normal">APELLIDO MATERNO</th>
                     <th className="py-2 fw-normal">GENERO</th>
+                    <th className="py-2 fw-normal" data-html2canvas-ignore="true">ACCIÓN</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {detalles.length == 0 ? <tr><td colSpan={8}><span className="d-flex text-muted justify-content-center my-3">Aún no ingresas datos.</span></td></tr> : detalles.map((fila, index) => (
+                  {detalles.length == 0 ? <tr><td colSpan={9}><span className="d-flex text-muted justify-content-center my-3">Aún no ingresas datos.</span></td></tr> : detalles.map((fila, index) => (
                     <tr key={fila.id}>
                       <td className="p-1">
                         <input type="date" value={fila.fechaEmision} onChange={(e) => handleInputChange(index, 'fechaEmision', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" />
@@ -209,6 +263,9 @@ export default function ModuloRecepcionDocumentos() {
                           <option value="F">F</option>
                         </select>
                       </td>
+                      <td className="p-1" data-html2canvas-ignore="true">
+                        <button className="btn btn-danger" onClick={e=>eliminarFila(fila.id)} title="Eliminar fila"><span className="bi bi-trash text-light"></span></button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -217,21 +274,21 @@ export default function ModuloRecepcionDocumentos() {
           </div>
 
           {/* SECCIÓN 3: Responsables */}
-          <div className="row text-center pt-2">
+          <div className="row text-center pt-2 w-100">
             <div className="col-12 col-md-6 mb-4 mb-md-0">
               <input type="text" 
-              className="form-control text-center text-uppercase fw-medium mx-auto mb-1 border-top-0 border-end-0 border-start-0 rounded-0 bg-transparent" 
-              placeholder="Nombre de quien entrega" 
-              style={{ width: '75%', borderBottom: '2px solid #6c757d', boxShadow: 'none' }}
-              onChange={(e) => buscarNombre(e as any, e.target.value)}
+              className="form-control text-center text-uppercase fw-medium mx-auto mb-1 border-bottom-0 border-end-0 border-start-0 rounded-0 bg-transparent" 
+              placeholder="RUT o Nombre de quien entrega" 
+              style={{ width: '75%', borderTop: '2px solid #6c757d', boxShadow: 'none' }}
+              onChange={e => buscarNombre(e as any, e.target.value)}
               />
               <span className="text-muted small">Entrega</span>
             </div>
             <div className="col-12 col-md-6">
               <input type="text" 
-              className="form-control text-center text-uppercase fw-medium mx-auto mb-1 border-top-0 border-end-0 border-start-0 rounded-0 bg-transparent" 
-              placeholder="Nombre de quien recibe" 
-              style={{ width: '75%', borderBottom: '2px solid #6c757d', boxShadow: 'none' }} 
+              className="form-control text-center text-uppercase fw-medium mx-auto mb-1 border-bottom-0 border-end-0 border-start-0 rounded-0 bg-transparent" 
+              placeholder="RUT o Nombre de quien recibe" 
+              style={{ width: '75%', borderTop: '2px solid #6c757d', boxShadow: 'none' }} 
               onChange={(e) => buscarNombre(e as any, e.target.value)}
               />
               <span className="text-muted small">Recibe</span>
@@ -239,8 +296,12 @@ export default function ModuloRecepcionDocumentos() {
           </div>
 
           {/* Acciones */}
-          <div className="d-flex justify-content-end mt-5">
-            <button type="button" className="btn btn-success px-4 py-2 shadow-sm">
+          <div className="d-flex justify-content-end align-items-end mt-5">
+            <button type="button" 
+            className="btn btn-success px-4 py-2 shadow-sm"
+            onClick={generarPDF}
+            data-html2canvas-ignore="true"
+            >
               Guardar Documento
             </button>
           </div>
