@@ -15,6 +15,9 @@ export default function ModuloRecepcionDocumentos() {
   const [loading, setLoading] = useState(true);
   const [baseDatosTrabajadores, setBaseDatosTrabajadores] = useState<Trabajador[]>([]);
   const [fechaRecepcion, setFechaRecepcion] = useState(new Date().toISOString().split('T')[0]);
+  const [detalleDocumento, setDetalleDocumento] = useState("");
+  const [recibe, setRecibe] = useState("");
+  const [entrega, setEntrega] = useState("");
   const pdfRef = useRef<HTMLDivElement>(null);
 
   // Estado para manejar las filas de la tabla dinámicamente
@@ -100,29 +103,44 @@ export default function ModuloRecepcionDocumentos() {
   };
 
   const generarPDF = async () => {
+    if(tiposSeleccionados.length == 0) return toast.error("Debe seleccionar un tipo de documento.");
+    if(!detalleDocumento) return toast.error("Debe ingresar descripción documento.");
+    if(detalles.length == 0) return toast.error("No puede generar un documento sin detalle");
     const elemento = pdfRef.current;
     if (!elemento) return;
+    if(!entrega) return toast.error("Debe ingresar el emisor.");
+    if(!recibe) return toast.error("Debe ingresar el receptor.");
 
     try {
-      // Configuramos html2canvas para capturar con buena calidad (scale: 2)
-      const canvas = await html2canvas(elemento, {
-        scale: 2,
-        useCORS: true,
-        logging: false
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      
-      // Creamos el documento en formato A4 vertical ('p')
-      const pdf = new jsPDF('p', 'mm', 'letter');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const canvas = await html2canvas(elemento, {
+      scale: 2,
+      useCORS: true,
+      logging: false
+    });
+    
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'letter');
+    
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight(); // Altura de una página A4
+    const imgHeight = (canvas.height * pdfWidth) / canvas.width; // Altura total de tu imagen
+    
+    let heightLeft = imgHeight;
+    let position = 0;
 
-      // Agregamos la imagen generada al PDF
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      
-      // Descargamos el archivo
-      pdf.save('Recepcion_Documentos.pdf');
+    // 1. Agregamos la primera página (desde arriba)
+    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    // 2. Si todavía queda imagen por imprimir, agregamos más páginas
+    while (heightLeft > 0) {
+      position -= pageHeight; // Desplazamos la imagen hacia arriba el equivalente a una hoja
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+    
+    pdf.save('Recepcion_Documentos.pdf');
       toast.success("Documento generado con éxito.");
     } catch (error) {
       toast.error("Hubo un error al generar el PDF");
@@ -193,105 +211,112 @@ export default function ModuloRecepcionDocumentos() {
               </div>
               <div className="mb-3">
                 <label className="form-label fw-medium text-secondary">Cantidad / Descripción general</label>
-                <input type="text" className="form-control shadow-sm" placeholder="Ej: 4 Contratos rectificados, 1 copia" />
+                <input type="text" 
+                className="form-control shadow-sm" 
+                placeholder="Ej: 4 Contratos rectificados, 1 copia" 
+                value={detalleDocumento}
+                onChange={e=>setDetalleDocumento(e.target.value)}
+                 />
               </div>
             </div>
           </div>
 
           {/* SECCIÓN 2: Detalle de los Documentos (Tabla) */}
-          <div className="mb-5 pb-4 border-bottom w-100">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h5 className="fw-semibold m-0">Detalle</h5>
-              <button type="button" 
-              onClick={agregarFila} 
-              className="btn btn-primary btn-sm px-3 shadow-sm"
-              data-html2canvas-ignore="true"
-              >
-                + Añadir Fila
-              </button>
-            </div>
-            <div className="table-responsive">
-              <table className="table table-bordered table-hover align-middle text-nowrap mb-0">
-                <thead style={{ backgroundColor: '#8b0000', color: 'white' }}>
-                  <tr>
-                    <th className="py-2 fw-normal">FECHA EMISIÓN</th>
-                    <th className="py-2 fw-normal">PROGRAMA</th>
-                    <th className="py-2 fw-normal">RUT</th>
-                    <th className="py-2 fw-normal text-center">DV</th>
-                    <th className="py-2 fw-normal">NOMBRE</th>
-                    <th className="py-2 fw-normal">APELLIDO PATERNO</th>
-                    <th className="py-2 fw-normal">APELLIDO MATERNO</th>
-                    <th className="py-2 fw-normal">GENERO</th>
-                    <th className="py-2 fw-normal" data-html2canvas-ignore="true">ACCIÓN</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detalles.length == 0 ? <tr><td colSpan={9}><span className="d-flex text-muted justify-content-center my-3">Aún no ingresas datos.</span></td></tr> : detalles.map((fila, index) => (
-                    <tr key={fila.id}>
-                      <td className="p-1">
-                        <input type="date" value={fila.fechaEmision} onChange={(e) => handleInputChange(index, 'fechaEmision', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" />
-                      </td>
-                      <td className="p-1">
-                        <input type="text" value={fila.cabecera} onChange={(e) => handleInputChange(index, 'cabecera', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" placeholder="PZD1" />
-                      </td>
-                      <td className="p-1">
-                        <input 
-                          type="text" 
-                          value={fila.rut} 
-                          onChange={(e) => handleInputChange(index, 'rut', e.target.value)} 
-                          onBlur={() => buscarTrabajador(index)} // <-- AQUÍ SE DISPARA LA BÚSQUEDA AL SALIR DEL INPUT
-                          className="form-control form-control-sm border-0 bg-transparent shadow-none" 
-                          placeholder="20910472" 
-                        />
-                      </td>
-                      <td className="p-1 text-center">
-                        <input type="text" value={fila.dv} onChange={(e) => handleInputChange(index, 'dv', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none text-center d-inline-block" placeholder="5" maxLength={1} style={{ width: '40px' }} />
-                      </td>
-                      <td className="p-1">
-                        <input type="text" value={fila.nombre} onChange={(e) => handleInputChange(index, 'nombre', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" placeholder="Nombre" />
-                      </td>
-                      <td className="p-1">
-                        <input type="text" value={fila.apellidoP} onChange={(e) => handleInputChange(index, 'apellidoP', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" placeholder="Apellido P" />
-                      </td>
-                      <td className="p-1">
-                        <input type="text" value={fila.apellidoM ?? ""} onChange={(e) => handleInputChange(index, 'apellidoM', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" placeholder="Apellido M" />
-                      </td>
-                      <td className="p-1">
-                        <select value={fila.genero} onChange={(e) => handleInputChange(index, 'genero', e.target.value)} className="form-select form-select-sm border-0 bg-transparent shadow-none">
-                          <option value="SR">S/R</option>
-                          <option value="M">M</option>
-                          <option value="F">F</option>
-                        </select>
-                      </td>
-                      <td className="p-1" data-html2canvas-ignore="true">
-                        <button className="btn btn-danger" onClick={e=>eliminarFila(fila.id)} title="Eliminar fila"><span className="bi bi-trash text-light"></span></button>
-                      </td>
+          <div>
+            <div className="mb-5 pb-4 border-bottom w-100">
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h5 className="fw-semibold m-0">Detalle</h5>
+                <button type="button" 
+                onClick={agregarFila} 
+                className="btn btn-primary btn-sm px-3 shadow-sm"
+                data-html2canvas-ignore="true"
+                >
+                  + Añadir Fila
+                </button>
+              </div>
+              <div className="table-responsive">
+                <table className="table table-bordered table-hover align-middle text-nowrap mb-0">
+                  <thead style={{ backgroundColor: '#8b0000', color: 'white' }}>
+                    <tr>
+                      <th className="py-2 fw-normal">FECHA EMISIÓN</th>
+                      <th className="py-2 fw-normal">PROGRAMA</th>
+                      <th className="py-2 fw-normal">RUT</th>
+                      <th className="py-2 fw-normal text-center">DV</th>
+                      <th className="py-2 fw-normal">NOMBRE</th>
+                      <th className="py-2 fw-normal">APELLIDO PATERNO</th>
+                      <th className="py-2 fw-normal">APELLIDO MATERNO</th>
+                      <th className="py-2 fw-normal">GENERO</th>
+                      <th className="py-2 fw-normal" data-html2canvas-ignore="true">ACCIÓN</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {detalles.length == 0 ? <tr><td colSpan={9}><span className="d-flex text-muted justify-content-center my-3">Aún no ingresas datos.</span></td></tr> : detalles.map((fila, index) => (
+                      <tr key={fila.id}>
+                        <td className="p-1">
+                          <input type="date" value={fila.fechaEmision} onChange={(e) => handleInputChange(index, 'fechaEmision', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" />
+                        </td>
+                        <td className="p-1">
+                          <input type="text" value={fila.cabecera} onChange={(e) => handleInputChange(index, 'cabecera', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" placeholder="PZD1" />
+                        </td>
+                        <td className="p-1">
+                          <input 
+                            type="text" 
+                            value={fila.rut} 
+                            onChange={(e) => handleInputChange(index, 'rut', e.target.value)} 
+                            onBlur={() => buscarTrabajador(index)} // <-- AQUÍ SE DISPARA LA BÚSQUEDA AL SALIR DEL INPUT
+                            className="form-control form-control-sm border-0 bg-transparent shadow-none" 
+                            placeholder="20910472" 
+                          />
+                        </td>
+                        <td className="p-1 text-center">
+                          <input type="text" value={fila.dv} onChange={(e) => handleInputChange(index, 'dv', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none text-center d-inline-block" placeholder="5" maxLength={1} style={{ width: '40px' }} />
+                        </td>
+                        <td className="p-1">
+                          <input type="text" value={fila.nombre} onChange={(e) => handleInputChange(index, 'nombre', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" placeholder="Nombre" />
+                        </td>
+                        <td className="p-1">
+                          <input type="text" value={fila.apellidoP} onChange={(e) => handleInputChange(index, 'apellidoP', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" placeholder="Apellido P" />
+                        </td>
+                        <td className="p-1">
+                          <input type="text" value={fila.apellidoM ?? ""} onChange={(e) => handleInputChange(index, 'apellidoM', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" placeholder="Apellido M" />
+                        </td>
+                        <td className="p-1">
+                          <select value={fila.genero} onChange={(e) => handleInputChange(index, 'genero', e.target.value)} className="form-select form-select-sm border-0 bg-transparent shadow-none">
+                            <option value="SR">S/R</option>
+                            <option value="M">M</option>
+                            <option value="F">F</option>
+                          </select>
+                        </td>
+                        <td className="p-1" data-html2canvas-ignore="true">
+                          <button className="btn btn-danger" onClick={e=>eliminarFila(fila.id)} title="Eliminar fila"><span className="bi bi-trash text-light"></span></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
 
-          {/* SECCIÓN 3: Responsables */}
-          <div className="row text-center pt-2 w-100">
-            <div className="col-12 col-md-6 mb-4 mb-md-0">
-              <input type="text" 
-              className="form-control text-center text-uppercase fw-medium mx-auto mb-1 border-bottom-0 border-end-0 border-start-0 rounded-0 bg-transparent" 
-              placeholder="RUT o Nombre de quien entrega" 
-              style={{ width: '75%', borderTop: '2px solid #6c757d', boxShadow: 'none' }}
-              onChange={e => buscarNombre(e as any, e.target.value)}
-              />
-              <span className="text-muted small">Entrega</span>
-            </div>
-            <div className="col-12 col-md-6">
-              <input type="text" 
-              className="form-control text-center text-uppercase fw-medium mx-auto mb-1 border-bottom-0 border-end-0 border-start-0 rounded-0 bg-transparent" 
-              placeholder="RUT o Nombre de quien recibe" 
-              style={{ width: '75%', borderTop: '2px solid #6c757d', boxShadow: 'none' }} 
-              onChange={(e) => buscarNombre(e as any, e.target.value)}
-              />
-              <span className="text-muted small">Recibe</span>
+            {/* SECCIÓN 3: Responsables */}
+            <div className="row text-center pt-2 w-100">
+              <div className="col-12 col-md-6 mb-4 mb-md-0">
+                <input type="text" 
+                className="form-control text-center text-uppercase fw-medium mx-auto mb-1 border-bottom-0 border-end-0 border-start-0 rounded-0 bg-transparent" 
+                placeholder="RUT o Nombre de quien entrega" 
+                style={{ width: '75%', borderTop: '2px solid #6c757d', boxShadow: 'none' }}
+                onChange={e => {buscarNombre(e as any, e.target.value); setEntrega(e.target.value)}}
+                />
+                <span className="text-muted small">Entrega</span>
+              </div>
+              <div className="col-12 col-md-6">
+                <input type="text" 
+                className="form-control text-center text-uppercase fw-medium mx-auto mb-1 border-bottom-0 border-end-0 border-start-0 rounded-0 bg-transparent" 
+                placeholder="RUT o Nombre de quien recibe" 
+                style={{ width: '75%', borderTop: '2px solid #6c757d', boxShadow: 'none' }} 
+                onChange={(e) => {buscarNombre(e as any, e.target.value); setRecibe(e.target.value)}}
+                />
+                <span className="text-muted small">Recibe</span>
+              </div>
             </div>
           </div>
 
