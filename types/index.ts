@@ -18,6 +18,7 @@ export interface Trabajador {
   segundo_apellido: string | null;
   contratos?: Contrato[];
   num_contratos?: number; 
+  genero?: "SR" | "M" | "F" | string;
 }
 
 export interface AlertaNotificacion {
@@ -68,4 +69,30 @@ export interface ResumenHorasFuncionario {
   horasConsumidasAnuales: number;
   horasDisponiblesAnuales: number; // 44 - horasConsumidasAnuales
   horasConsumidasMesSeleccionado: number;
+}
+
+
+type TipoDocumento = 'Finiquito' | 'Contrato' | 'Anexo contrato' | 'Notificación' | 'Otro';
+
+interface FormularioRecepcion {
+  tiposDocumento: TipoDocumento[];
+  detalleOtroTipo?: string; // Nuevo campo para guardar la especificación
+  fechaRecepcion: string;
+  cantidadDocumentos: string;
+  detalles: DetalleDocumento[];
+  quienEntrega: string;
+  quienRecibe: string;
+
+}  
+
+export interface DetalleDocumento {
+  id: number;
+  fechaEmision: string;
+  cabecera: string;
+  nombre: string;
+  apellidoP: string;
+  apellidoM: string | null;
+  genero: string | undefined;
+  rut: string;
+  dv: string;
 }

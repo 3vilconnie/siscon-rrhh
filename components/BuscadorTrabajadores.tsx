@@ -21,7 +21,6 @@ export default function BuscadorTrabajadores({
         <div className="input-group">
           <span className="input-group-text bg-light text-secondary border-end-0">
             {estaFiltrando ? (
-              // Icono de carga animado mientras escribe
               <span className="spinner-border spinner-border-sm text-primary" role="status"></span>
             ) : (
               <i className="bi bi-search"></i>

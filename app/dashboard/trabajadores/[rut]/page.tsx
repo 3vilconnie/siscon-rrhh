@@ -127,7 +127,11 @@ export default function DetalleTrabajadorPage() {
     return { dias: diffDays, meses: parseFloat(diffMonths) };
   };
 
-  if (loading) return <div className="text-center py-5 text-muted">Cargando ficha histórica...</div>;
+  if (loading) return (
+    <div className="spinner-border" role="status">
+    <span className="sr-only">Loading...</span>
+    </div>
+  );
   if (!empleado) return null;
 
   return (
@@ -199,7 +203,7 @@ export default function DetalleTrabajadorPage() {
                       <div className="row mt-3 text-dark small">
                         <div className="col-sm-6 mb-2">
                           <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>PERÍODO</span>
-                          <span className="fw-semibold">{c.fecha_inicio}</span> a <span className="fw-semibold">{c.fecha_termino || 'Indefinido'}</span>
+                          <span className="fw-semibold">{new Date(c.fecha_inicio).toLocaleDateString('es-CL')}</span> a <span className="fw-semibold">{c.fecha_termino ? new Date(c.fecha_termino).toLocaleDateString('es-CL') : "Indefinido"}</span>
                         </div>
                         <div className="col-sm-3 mb-2">
                           <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>JORNADA</span>

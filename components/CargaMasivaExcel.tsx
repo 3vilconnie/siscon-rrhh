@@ -16,7 +16,7 @@ interface ArchivoPrevia {
 export default function CargaMasivaExcel() {
   const [archivos, setArchivos] = useState<ArchivoPrevia[]>([]);
   const [procesando, setProcesando] = useState(false);
-  const [isDragging, setIsCollapsed] = useState(false); // Controla el estado visual del arrastre
+  const [isDragging, setIsCollapsed] = useState(false); 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Convertir bytes a un formato legible por humanos
@@ -176,8 +176,6 @@ export default function CargaMasivaExcel() {
       </div>
       
       <div className="card-body p-4 p-md-5">
-        
-        {/* ZONA INTERACTIVA DRAG AND DROP */}
         <div 
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
