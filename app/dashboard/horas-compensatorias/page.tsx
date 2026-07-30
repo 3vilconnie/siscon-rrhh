@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import { Card, Row, Col, Form, Table, Badge, Button, Spinner, Alert, InputGroup, Modal } from 'react-bootstrap';
 import { Trabajador, ResumenHorasFuncionario } from '@/types';
 import BuscadorTrabajadores from '@/components/BuscadorTrabajadores';
 import Pagination from '@/components/Pagination';
@@ -270,20 +271,19 @@ export default function HorasCompensatoriasPage() {
         <p className="text-muted small">Gestión de rebajas con tope de {TOPE_ANUAL} horas anuales por funcionario institucional.</p>
       </div>
 
-      <div className="row g-4">
+      <Row className="g-4">
         {/* FORMULARIO DE INGRESO */}
-        <div className="col-12 col-xl-4">
-          <div className="card shadow-sm border-0 bg-white p-4">
+        <Col xs={12} xl={4}>
+          <Card className="shadow-sm border-0 bg-white p-4">
             <h5 className="fw-bold text-secondary border-bottom pb-2 mb-3">
               <i className="bi bi-clock-fill me-2 text-danger"></i>Registrar Uso de Horas
             </h5>
-            <form onSubmit={handleRegistrarHoras} className="d-flex flex-column gap-3">
-              <div className="row g-2">
-                <div className="col-8">
-                  <label className="form-label small fw-bold text-secondary">RUT Funcionario</label>
-                  <input
+            <Form onSubmit={handleRegistrarHoras} className="d-flex flex-column gap-3">
+              <Row className="g-2">
+                <Col xs={8}>
+                  <Form.Label className="small fw-bold text-secondary">RUT Funcionario</Form.Label>
+                  <Form.Control
                     type="text"
-                    className="form-control"
                     placeholder="Ej: 19543210"
                     value={rutInput}
                     onChange={(e) => setRutInput(e.target.value)}
@@ -291,60 +291,59 @@ export default function HorasCompensatoriasPage() {
                     required
                     tabIndex={1}
                   />
-                </div>
-                <div className="col-4">
-                  <label className="form-label small fw-bold text-secondary">DV</label>
-                  <input
+                </Col>
+                <Col xs={4}>
+                  <Form.Label className="small fw-bold text-secondary">DV</Form.Label>
+                  <Form.Control
                     type="text"
-                    className="form-control text-center bg-light text-muted fw-bold"
+                    className="text-center bg-light text-muted fw-bold"
                     value={dvInput}
                     readOnly
                   />
-                </div>
-              </div>
+                </Col>
+              </Row>
 
               <div>
-                <label className="form-label small fw-bold text-secondary">Nombres</label>
-                <input
+                <Form.Label className="small fw-bold text-secondary">Nombres</Form.Label>
+                <Form.Control
                   type="text"
-                  className="form-control bg-light text-muted text-uppercase"
+                  className="bg-light text-muted text-uppercase"
                   value={nombresInput}
                   readOnly
                 />
               </div>
 
-              <div className="row g-2">
-                <div className="col-6">
-                  <label className="form-label small fw-bold text-secondary">Apellido Paterno</label>
-                  <input
+              <Row className="g-2">
+                <Col xs={6}>
+                  <Form.Label className="small fw-bold text-secondary">Apellido Paterno</Form.Label>
+                  <Form.Control
                     type="text"
-                    className="form-control bg-light text-muted text-uppercase"
+                    className="bg-light text-muted text-uppercase"
                     value={primerApellidoInput}
                     readOnly
                   />
-                </div>
-                <div className="col-6">
-                  <label className="form-label small fw-bold text-secondary">Apellido Materno</label>
-                  <input
+                </Col>
+                <Col xs={6}>
+                  <Form.Label className="small fw-bold text-secondary">Apellido Materno</Form.Label>
+                  <Form.Control
                     type="text"
-                    className="form-control bg-light text-muted text-uppercase"
+                    className="bg-light text-muted text-uppercase"
                     value={segundoApellidoInput}
                     readOnly
                   />
-                </div>
-              </div>
+                </Col>
+              </Row>
 
               {rutInput && !trabajadorEncontrado && (
-                <div className="alert alert-warning py-2 small m-0 border-0 shadow-sm font-monospace text-center">
+                <Alert variant="warning" className="py-2 small m-0 border-0 shadow-sm font-monospace text-center">
                   ⚠️ RUT no registrado en el sistema.
-                </div>
+                </Alert>
               )}
 
               <div>
-                <label className="form-label small fw-bold text-secondary">Fecha del Permiso</label>
-                <input
+                <Form.Label className="small fw-bold text-secondary">Fecha del Permiso</Form.Label>
+                <Form.Control
                   type="date"
-                  className="form-control"
                   value={fechaInput}
                   onChange={(e) => setFechaInput(e.target.value)}
                   disabled={guardando || !trabajadorEncontrado}
@@ -353,12 +352,11 @@ export default function HorasCompensatoriasPage() {
                 />
               </div>
               <div>
-                <label className="form-label small fw-bold text-secondary">Horas Solicitadas</label>
-                <div className="input-group">
-                  <input
+                <Form.Label className="small fw-bold text-secondary">Horas Solicitadas</Form.Label>
+                <InputGroup>
+                  <Form.Control
                     type="number"
                     step="0.25"
-                    className="form-control"
                     placeholder="Ej: 4.5"
                     value={horasInput}
                     onChange={(e) => setHorasInput(e.target.value)}
@@ -366,23 +364,24 @@ export default function HorasCompensatoriasPage() {
                     required
                     tabIndex={3}
                   />
-                  <span className="input-group-text bg-light text-muted">Hrs.</span>
-                </div>
+                  <InputGroup.Text className="bg-light text-muted">Hrs.</InputGroup.Text>
+                </InputGroup>
               </div>
-              <button 
-                type="submit" 
-                className="btn btn-danger fw-bold mt-2" 
+              <Button
+                type="submit"
+                variant="danger"
+                className="fw-bold mt-2"
                 disabled={guardando || !trabajadorEncontrado}
                 tabIndex={4}
               >
                 {guardando ? 'Procesando...' : 'Descontar Horas'}
-              </button>
-            </form>
-          </div>
-        </div>
+              </Button>
+            </Form>
+          </Card>
+        </Col>
 
         {/* REPORTE CON BUSCADOR, BOTÓN DE DETALLE Y PAGINACIÓN */}
-        <div className="col-12 col-xl-8">
+        <Col xs={12} xl={8}>
           <BuscadorTrabajadores 
             busqueda={busqueda}
             setBusqueda={setBusqueda}
@@ -390,14 +389,14 @@ export default function HorasCompensatoriasPage() {
             totalTotal={resumenes.length}
           />
 
-          <div className="card shadow-sm border-0 bg-white p-4">
+          <Card className="shadow-sm border-0 bg-white p-4">
             <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center border-bottom pb-3 mb-3 gap-2">
               <h5 className="fw-bold text-secondary m-0">
                 <i className="bi bi-calendar-check me-2 text-primary"></i>Resumen de Saldos del Personal
               </h5>
-              
+
               <div className="d-flex gap-2">
-                <select className="form-select form-select-sm" value={mesSeleccionado} onChange={(e) => setMesSeleccionado(Number(e.target.value))}>
+                <Form.Select size="sm" value={mesSeleccionado} onChange={(e) => setMesSeleccionado(Number(e.target.value))}>
                   <option value={1}>Enero</option>
                   <option value={2}>Febrero</option>
                   <option value={3}>Marzo</option>
@@ -410,18 +409,18 @@ export default function HorasCompensatoriasPage() {
                   <option value={10}>Octubre</option>
                   <option value={11}>Noviembre</option>
                   <option value={12}>Diciembre</option>
-                </select>
+                </Form.Select>
 
-                <select className="form-select form-select-sm" value={anoSeleccionado} onChange={(e) => setAnoSeleccionado(Number(e.target.value))}>
+                <Form.Select size="sm" value={anoSeleccionado} onChange={(e) => setAnoSeleccionado(Number(e.target.value))}>
                   <option value={2025}>2025</option>
                   <option value={2026}>2026</option>
                   <option value={2027}>2027</option>
-                </select>
+                </Form.Select>
               </div>
             </div>
 
             <div className="table-responsive">
-              <table className="table table-hover align-middle m-0 small">
+              <Table hover className="align-middle m-0 small">
                 <thead className="table-dark text-uppercase text-center">
                   <tr>
                     <th className="text-start ps-3">Funcionario</th>
@@ -435,7 +434,7 @@ export default function HorasCompensatoriasPage() {
                   {loadingTabla ? (
                     <tr>
                       <td colSpan={5} className="text-center py-4 text-muted">
-                        <span className="spinner-border spinner-border-sm me-2 text-primary"></span>
+                        <Spinner animation="border" size="sm" className="me-2 text-primary" />
                         Consolidando registros históricos...
                       </td>
                     </tr>
@@ -455,127 +454,118 @@ export default function HorasCompensatoriasPage() {
                         <td className="fw-semibold text-primary">{r.horasConsumidasMesSeleccionado} hrs</td>
                         <td className="fw-semibold text-danger">{r.horasConsumidasAnuales} / {TOPE_ANUAL} hrs</td>
                         <td>
-                          <span className={`badge px-2 py-1 ${r.horasDisponiblesAnuales <= 5 ? 'bg-danger text-white' : r.horasDisponiblesAnuales <= 15 ? 'bg-warning text-dark' : 'bg-success text-white'}`}>
+                          <Badge
+                            bg={r.horasDisponiblesAnuales <= 5 ? 'danger' : r.horasDisponiblesAnuales <= 15 ? 'warning' : 'success'}
+                            text={r.horasDisponiblesAnuales > 5 && r.horasDisponiblesAnuales <= 15 ? 'dark' : undefined}
+                            className="px-2 py-1"
+                          >
                             {r.horasDisponiblesAnuales} hrs libres
-                          </span>
+                          </Badge>
                         </td>
                         {/* BOTÓN NUEVO: VER DETALLE */}
                         <td>
-                          <button 
-                            type="button" 
-                            className="btn btn-outline-primary btn-sm fw-bold d-inline-flex align-items-center gap-1"
+                          <Button
+                            type="button"
+                            variant="outline-primary"
+                            size="sm"
+                            className="fw-bold d-inline-flex align-items-center gap-1"
                             onClick={() => handleVerDetalle(r)}
                           >
                             <i className="bi bi-eye-fill"></i> Ver Detalle
-                          </button>
+                          </Button>
                         </td>
                       </tr>
                     ))
                   )}
                 </tbody>
-              </table>
+              </Table>
             </div>
-          </div>
+          </Card>
 
           <div className="mt-4">
-            <Pagination 
+            <Pagination
               paginaActual={paginaActual}
               totalPaginas={totalPaginas}
               onPaginaChange={(numero) => setPaginaActual(numero)}
             />
           </div>
-        </div>
-      </div>
+        </Col>
+      </Row>
 
-      {/* --- NUEVO: MODAL FLOTANTE DE BOOTSTRAP PARA DETALLES --- */}
-      {modalAbierto && (
-        <div className="modal show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered modal-md">
-            <div className="modal-content border-0 shadow-lg">
-              <div className="modal-header bg-dark text-white border-0">
-                <h5 className="modal-title fw-bold">
-                  <i className="bi bi-journal-text me-2 text-primary"></i>
-                  Desglose de Uso Histórico
-                </h5>
-                <button 
-                  type="button" 
-                  className="btn-close btn-close-white" 
-                  onClick={() => setModalAbierto(false)}
-                ></button>
-              </div>
-              <div className="modal-body p-4">
-                {funcionarioSeleccionado && (
-                  <div className="mb-3 bg-light p-3 rounded shadow-sm">
-                    <div className="fw-bold text-dark text-uppercase">{funcionarioSeleccionado.nombreCompleto}</div>
-                    <div className="text-muted small font-monospace">RUT: {funcionarioSeleccionado.rut}-{funcionarioSeleccionado.dv}</div>
-                    <div className="mt-2 row text-center border-top pt-2">
-                      <div className="col-6 border-end">
-                        <small className="text-muted d-block">Consumido en {anoSeleccionado}</small>
-                        <span className="fw-bold text-danger">{funcionarioSeleccionado.horasConsumidasAnuales} hrs</span>
-                      </div>
-                      <div className="col-6">
-                        <small className="text-muted d-block">Saldo Libre</small>
-                        <span className="fw-bold text-success">{funcionarioSeleccionado.horasDisponiblesAnuales} hrs</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <h6 className="fw-bold text-secondary mb-2 border-bottom pb-1">Fechas y Cupos Solicitados ({anoSeleccionado})</h6>
-                
-                <div className="table-responsive" style={{ maxHeight: '250px', overflowY: 'auto' }}>
-                  <table className="table table-striped table-sm align-middle m-0 text-center">
-                    <thead className="table-secondary sticky-top">
-                      <tr>
-                        <th>N°</th>
-                        <th>Fecha de Permiso</th>
-                        <th>Horas Rebajadas</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loadingDetalle ? (
-                        <tr>
-                          <td colSpan={3} className="py-4 text-muted">
-                            <span className="spinner-border spinner-border-sm text-primary me-2"></span>
-                            Buscando registros...
-                          </td>
-                        </tr>
-                      ) : detallesHistorial.length === 0 ? (
-                        <tr>
-                          <td colSpan={3} className="py-4 text-muted small">No registra rebajas de horas compensatorias en este período.</td>
-                        </tr>
-                      ) : (
-                        detallesHistorial.map((d, index) => (
-                          <tr key={d.id}>
-                            <td className="text-muted font-monospace">{index + 1}</td>
-                            <td className="fw-medium">
-                              {new Date(d.fecha + 'T00:00:00').toLocaleDateString('es-CL', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric'
-                              })}
-                            </td>
-                            <td className="fw-bold text-danger">{d.horas_solicitadas} hrs</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div className="modal-footer border-0 bg-light py-2">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary btn-sm fw-bold" 
-                  onClick={() => setModalAbierto(false)}
-                >
-                  Cerrar Ventana
-                </button>
-              </div>
+      {/* --- MODAL DE DETALLE (react-bootstrap) --- */}
+      <Modal show={modalAbierto} onHide={() => setModalAbierto(false)} centered contentClassName="border-0 shadow-lg">
+        <Modal.Header closeButton closeVariant="white" className="bg-dark text-white border-0">
+          <Modal.Title className="fw-bold h5">
+            <i className="bi bi-journal-text me-2 text-primary"></i>
+            Desglose de Uso Histórico
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-4">
+          {funcionarioSeleccionado && (
+            <div className="mb-3 bg-light p-3 rounded shadow-sm">
+              <div className="fw-bold text-dark text-uppercase">{funcionarioSeleccionado.nombreCompleto}</div>
+              <div className="text-muted small font-monospace">RUT: {funcionarioSeleccionado.rut}-{funcionarioSeleccionado.dv}</div>
+              <Row className="mt-2 text-center border-top pt-2">
+                <Col xs={6} className="border-end">
+                  <small className="text-muted d-block">Consumido en {anoSeleccionado}</small>
+                  <span className="fw-bold text-danger">{funcionarioSeleccionado.horasConsumidasAnuales} hrs</span>
+                </Col>
+                <Col xs={6}>
+                  <small className="text-muted d-block">Saldo Libre</small>
+                  <span className="fw-bold text-success">{funcionarioSeleccionado.horasDisponiblesAnuales} hrs</span>
+                </Col>
+              </Row>
             </div>
+          )}
+
+          <h6 className="fw-bold text-secondary mb-2 border-bottom pb-1">Fechas y Cupos Solicitados ({anoSeleccionado})</h6>
+
+          <div className="table-responsive" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+            <Table striped size="sm" className="align-middle m-0 text-center">
+              <thead className="table-secondary sticky-top">
+                <tr>
+                  <th>N°</th>
+                  <th>Fecha de Permiso</th>
+                  <th>Horas Rebajadas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingDetalle ? (
+                  <tr>
+                    <td colSpan={3} className="py-4 text-muted">
+                      <Spinner animation="border" size="sm" className="text-primary me-2" />
+                      Buscando registros...
+                    </td>
+                  </tr>
+                ) : detallesHistorial.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-4 text-muted small">No registra rebajas de horas compensatorias en este período.</td>
+                  </tr>
+                ) : (
+                  detallesHistorial.map((d, index) => (
+                    <tr key={d.id}>
+                      <td className="text-muted font-monospace">{index + 1}</td>
+                      <td className="fw-medium">
+                        {new Date(d.fecha + 'T00:00:00').toLocaleDateString('es-CL', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}
+                      </td>
+                      <td className="fw-bold text-danger">{d.horas_solicitadas} hrs</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </Table>
           </div>
-        </div>
-      )}
+        </Modal.Body>
+        <Modal.Footer className="border-0 bg-light py-2">
+          <Button type="button" variant="secondary" size="sm" className="fw-bold" onClick={() => setModalAbierto(false)}>
+            Cerrar Ventana
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }

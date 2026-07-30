@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { Alert, Row, Col, Button } from 'react-bootstrap';
 
 interface TrabajadorAlerta {
   rut: number;
@@ -33,7 +34,7 @@ export default function AlertasPanel() {
   if (loading || alertas.length === 0) return null;
 
   return (
-    <div className="alert alert-warning shadow-sm border-start border-4 border-warning mb-4" role="alert">
+    <Alert variant="warning" className="shadow-sm border-start border-4 border-warning mb-4">
       <div className="d-flex align-items-center mb-2">
         <i className="bi bi-exclamation-triangle-fill text-warning fs-4 me-2"></i>
         <h5 className="alert-heading m-0 fw-bold text-dark">Alerta Legal de Contratos</h5>
@@ -41,9 +42,9 @@ export default function AlertasPanel() {
       <p className="small mb-3 text-secondary">
         Los siguientes trabajadores registran 2 o más contratos dentro de un periodo de 15 meses y se encuentran con un contrato vigente:
       </p>
-      <div className="row g-2">
+      <Row className="g-2">
         {alertas.map((t) => (
-          <div key={t.rut} className="col-12">
+          <Col key={t.rut} xs={12}>
             <div className="bg-white p-2 rounded border d-flex justify-content-between align-items-center">
               <div>
                 <span className="fw-bold text-dark">{t.nombres} {t.primer_apellido}</span>
@@ -52,13 +53,13 @@ export default function AlertasPanel() {
                   {t.total_contratos} contratos en un lapso de {t.meses_entre_contratos} meses.
                 </div>
               </div>
-              <Link href={`/dashboard/trabajadores/${t.rut}`} className="btn btn-sm btn-outline-warning">
+              <Button as={Link as any} href={`/dashboard/trabajadores/${t.rut}`} size="sm" variant="outline-warning">
                 Ver Historial
-              </Link>
+              </Button>
             </div>
-          </div>
+          </Col>
         ))}
-      </div>
-    </div>
+      </Row>
+    </Alert>
   );
 }

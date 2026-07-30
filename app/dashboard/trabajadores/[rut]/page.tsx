@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import toast from 'react-hot-toast'; 
-import { Trabajador, Contrato } from '@/types'; 
+import toast from 'react-hot-toast';
+import { Card, Badge, Button, Spinner, Modal, Form, Row, Col } from 'react-bootstrap';
+import { Trabajador, Contrato } from '@/types';
 import React from 'react';
 
 export default function DetalleTrabajadorPage() {
@@ -128,9 +129,9 @@ export default function DetalleTrabajadorPage() {
   };
 
   if (loading) return (
-    <div className="spinner-border" role="status">
-    <span className="sr-only">Loading...</span>
-    </div>
+    <Spinner animation="border" role="status">
+      <span className="visually-hidden">Loading...</span>
+    </Spinner>
   );
   if (!empleado) return null;
 
@@ -142,16 +143,16 @@ export default function DetalleTrabajadorPage() {
         </Link>
       </div>
 
-      <div className="card shadow-sm border-0 mb-4 bg-dark text-white">
-        <div className="card-body p-4 d-flex justify-content-between align-items-center">
+      <Card className="shadow-sm border-0 mb-4 bg-dark text-white">
+        <Card.Body className="p-4 d-flex justify-content-between align-items-center">
           <div>
-            <span className="badge bg-info text-dark mb-2 font-monospace">Ficha del Trabajador</span>
+            <Badge bg="info" text="dark" className="mb-2 font-monospace">Ficha del Trabajador</Badge>
             <h2 className="fw-bold m-0 text-uppercase">{empleado.nombres} {empleado.primer_apellido} {empleado.segundo_apellido || ''}</h2>
             <p className="text-light-50 m-0 mt-1 small">RUN: {empleado.rut}-{empleado.dv}</p>
           </div>
           <i className="bi bi-person-badge text-white-50" style={{ fontSize: '3.5rem' }}></i>
-        </div>
-      </div>
+        </Card.Body>
+      </Card>
 
       <h4 className="fw-bold text-dark mb-4">Línea de Tiempo Contractual</h4>
       
@@ -169,10 +170,10 @@ export default function DetalleTrabajadorPage() {
                   <div className="position-relative mb-4 ps-4">
                     <div className="position-absolute rounded-circle bg-warning border border-2 border-white" 
                          style={{ width: '16px', height: '16px', left: '-9px', top: '50%', transform: 'translateY(-50%)' }}></div>
-                    <div className={`badge ${brecha.meses < 3 ? 'bg-danger' : 'bg-success'} text-white border`}>
+                    <Badge bg={brecha.meses < 3 ? 'danger' : 'success'} className="text-white border">
                       <i className="bi bi-clock-history me-1"></i>
                       Brecha: {brecha.meses} meses ({brecha.dias} días)
-                    </div>
+                    </Badge>
                     {brecha.meses < 3 && (
                       <span className="text-danger small ms-2 fw-semibold">
                         <i className="bi bi-exclamation-circle me-1"></i> No cumple enfriamiento legal
@@ -188,40 +189,40 @@ export default function DetalleTrabajadorPage() {
                     {idx + 1}
                   </div>
                   
-                  <div className={`card border-0 shadow-sm transition-all hover-shadow ${esVigente ? 'border-start border-4 border-success' : 'border-start border-4 border-secondary'}`}>
-                    <div className="card-body">
+                  <Card className={`border-0 shadow-sm transition-all hover-shadow ${esVigente ? 'border-start border-4 border-success' : 'border-start border-4 border-secondary'}`}>
+                    <Card.Body>
                       <div className="d-flex justify-content-between align-items-start mb-2">
                         <h6 className="fw-bold text-uppercase text-dark m-0 d-flex align-items-center">
-                          <i className="bi bi-file-earmark-person me-2 text-primary"></i> 
+                          <i className="bi bi-file-earmark-person me-2 text-primary"></i>
                           Contrato Registrado
                         </h6>
-                        <span className={`badge ${esVigente ? 'bg-success' : 'bg-secondary'}`}>
+                        <Badge bg={esVigente ? 'success' : 'secondary'}>
                           {esVigente ? 'Vigente' : 'Terminado'}
-                        </span>
-                      </div>
-                      
-                      <div className="row mt-3 text-dark small">
-                        <div className="col-sm-6 mb-2">
-                          <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>PERÍODO</span>
-                          <span className="fw-semibold">{new Date(c.fecha_inicio).toLocaleDateString('es-CL')}</span> a <span className="fw-semibold">{c.fecha_termino ? new Date(c.fecha_termino).toLocaleDateString('es-CL') : "Indefinido"}</span>
-                        </div>
-                        <div className="col-sm-3 mb-2">
-                          <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>JORNADA</span>
-                          <span className="fw-semibold">{c.jornada} Hrs.</span>
-                        </div>
-                        <div className="col-sm-3 mb-2">
-                          <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>SUELDO BASE</span>
-                          <span className="fw-semibold">${parseFloat(c.sueldo_base?.toString() || '0').toLocaleString('es-CL')}</span>
-                        </div>
+                        </Badge>
                       </div>
 
+                      <Row className="mt-3 text-dark small">
+                        <Col sm={6} className="mb-2">
+                          <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>PERÍODO</span>
+                          <span className="fw-semibold">{new Date(c.fecha_inicio).toLocaleDateString('es-CL')}</span> a <span className="fw-semibold">{c.fecha_termino ? new Date(c.fecha_termino).toLocaleDateString('es-CL') : "Indefinido"}</span>
+                        </Col>
+                        <Col sm={3} className="mb-2">
+                          <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>JORNADA</span>
+                          <span className="fw-semibold">{c.jornada} Hrs.</span>
+                        </Col>
+                        <Col sm={3} className="mb-2">
+                          <span className="text-muted d-block" style={{ fontSize: '0.75rem' }}>SUELDO BASE</span>
+                          <span className="fw-semibold">${parseFloat(c.sueldo_base?.toString() || '0').toLocaleString('es-CL')}</span>
+                        </Col>
+                      </Row>
+
                       <div className="border-top pt-2 mt-2 text-end">
-                        <button onClick={() => abrirEdicion(c)} className="btn btn-link btn-sm text-primary text-decoration-none p-0 fw-semibold">
+                        <Button variant="link" size="sm" onClick={() => abrirEdicion(c)} className="text-primary text-decoration-none p-0 fw-semibold">
                           <i className="bi bi-pencil-square me-1"></i> Editar Fechas
-                        </button>
+                        </Button>
                       </div>
-                    </div>
-                  </div>
+                    </Card.Body>
+                  </Card>
                 </div>
               </React.Fragment>
             );
@@ -234,43 +235,38 @@ export default function DetalleTrabajadorPage() {
       </div>
 
       {/* MODAL DE EDICIÓN */}
-      <div className={`modal fade ${modalAbierto ? 'show d-block bg-dark bg-opacity-50' : 'd-none'}`} tabIndex={-1} style={{ transition: 'all 0.2s' }}>
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content border-0 shadow-lg">
-            <div className="modal-header bg-primary text-white">
-              <h5 className="modal-title fw-bold">Modificar Términos del Contrato</h5>
-              <button type="button" className="btn-close btn-close-white" onClick={() => setModalAbierto(false)}></button>
-            </div>
-            <div className="modal-body">
-              <div className="row g-3">
-                <div className="col-6">
-                  <label className="form-label small fw-bold text-secondary">Jornada (Horas)</label>
-                  <input type="number" className="form-control" value={editJornada} onChange={(e) => setEditJornada(parseInt(e.target.value) || 0)} />
-                </div>
-                <div className="col-6">
-                  <label className="form-label small fw-bold text-secondary">Sueldo Base ($)</label>
-                  <input type="number" className="form-control" value={editSueldo} onChange={(e) => setEditSueldo(parseFloat(e.target.value) || 0)} />
-                </div>
-                <div className="col-6">
-                  <label className="form-label small fw-bold text-secondary">Fecha de Inicio</label>
-                  <input type="date" className="form-control" value={editInicio} onChange={(e) => setEditInicio(e.target.value)} />
-                </div>
-                <div className="col-6">
-                  <label className="form-label small fw-bold text-secondary">Fecha de Término</label>
-                  <input type="date" className="form-control" value={editTermino} onChange={(e) => setEditTermino(e.target.value)} />
-                  <div className="form-text small" style={{fontSize: '0.7rem'}}>Dejar en blanco si es indefinido.</div>
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer bg-light border-top-0">
-              <button type="button" className="btn btn-sm btn-outline-secondary px-3" onClick={() => setModalAbierto(false)}>Cancelar</button>
-              <button type="button" className="btn btn-sm btn-primary px-4 fw-bold" onClick={handleGuardarCambios} disabled={guardando}>
-                {guardando ? 'Guardando...' : 'Guardar Cambios'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Modal show={modalAbierto} onHide={() => setModalAbierto(false)} centered contentClassName="border-0 shadow-lg">
+        <Modal.Header closeButton closeVariant="white" className="bg-primary text-white">
+          <Modal.Title className="fw-bold h5">Modificar Términos del Contrato</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Row className="g-3">
+            <Col xs={6}>
+              <Form.Label className="small fw-bold text-secondary">Jornada (Horas)</Form.Label>
+              <Form.Control type="number" value={editJornada} onChange={(e) => setEditJornada(parseInt(e.target.value) || 0)} />
+            </Col>
+            <Col xs={6}>
+              <Form.Label className="small fw-bold text-secondary">Sueldo Base ($)</Form.Label>
+              <Form.Control type="number" value={editSueldo} onChange={(e) => setEditSueldo(parseFloat(e.target.value) || 0)} />
+            </Col>
+            <Col xs={6}>
+              <Form.Label className="small fw-bold text-secondary">Fecha de Inicio</Form.Label>
+              <Form.Control type="date" value={editInicio} onChange={(e) => setEditInicio(e.target.value)} />
+            </Col>
+            <Col xs={6}>
+              <Form.Label className="small fw-bold text-secondary">Fecha de Término</Form.Label>
+              <Form.Control type="date" value={editTermino} onChange={(e) => setEditTermino(e.target.value)} />
+              <Form.Text className="small" style={{ fontSize: '0.7rem' }}>Dejar en blanco si es indefinido.</Form.Text>
+            </Col>
+          </Row>
+        </Modal.Body>
+        <Modal.Footer className="bg-light border-top-0">
+          <Button type="button" size="sm" variant="outline-secondary" className="px-3" onClick={() => setModalAbierto(false)}>Cancelar</Button>
+          <Button type="button" size="sm" variant="primary" className="px-4 fw-bold" onClick={handleGuardarCambios} disabled={guardando}>
+            {guardando ? 'Guardando...' : 'Guardar Cambios'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }

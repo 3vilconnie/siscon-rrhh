@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
+import { Card, Form, Row, Col, InputGroup, Button, Spinner, Alert } from 'react-bootstrap';
 
 export default function FormularioTrabajador() {
   // 1. Estados de Identidad
@@ -175,126 +176,127 @@ export default function FormularioTrabajador() {
   };
 
   return (
-    <div className="card shadow-sm border-0 justify-content-center w-100" style={{ maxWidth: '850px' }}>
-      <div className="card-header bg-dark text-white fw-bold d-flex align-items-center">
+    <Card className="shadow-sm border-0 justify-content-center w-100" style={{ maxWidth: '850px' }}>
+      <Card.Header className="bg-dark text-white fw-bold d-flex align-items-center">
         <i className="bi bi-person-lines-fill me-2 fs-5"></i> Formulario de Personal y Contratos
-      </div>
-      
-      <div className="card-body p-4 p-md-5">
-        
+      </Card.Header>
+
+      <Card.Body className="p-4 p-md-5">
+
         {/* SECCIÓN 1: IDENTIDAD */}
         <h6 className="text-secondary border-bottom pb-2 mb-4 fw-bold text-uppercase d-flex align-items-center">
           <span className="bg-primary text-white rounded-circle d-inline-flex justify-content-center align-items-center me-2" style={{ width: '24px', height: '24px', fontSize: '12px' }}>1</span>
           Datos de Identidad
         </h6>
-        
-        <div className="row g-3 mb-4">
-          <div className="col-8 col-md-4">
-            <label className="form-label small fw-bold text-secondary">RUT (Solo números)</label>
-            <input
+
+        <Row className="g-3 mb-4">
+          <Col xs={8} md={4}>
+            <Form.Label className="small fw-bold text-secondary">RUT (Solo números)</Form.Label>
+            <Form.Control
               type="text"
-              className={`form-control ${bloqueado ? 'border-success bg-light fw-bold' : ''}`}
+              className={bloqueado ? 'border-success bg-light fw-bold' : ''}
               placeholder="Ej: 19496016"
               value={rut}
               onChange={(e) => setRut(e.target.value)}
               disabled={bloqueado}
               required
             />
-          </div>
-          <div className="col-4 col-md-2">
-            <label className="form-label small fw-bold text-secondary">DV</label>
-            <div className="input-group">
-              <span className="input-group-text bg-light fw-bold w-100 justify-content-center" style={{ height: '38px' }}>
-                {buscandoRut ? <span className="spinner-border spinner-border-sm text-primary" role="status"></span> : (dv || '-')}
-              </span>
-            </div>
-          </div>
-          <div className="col-md-6 d-flex align-items-end">
+          </Col>
+          <Col xs={4} md={2}>
+            <Form.Label className="small fw-bold text-secondary">DV</Form.Label>
+            <InputGroup>
+              <InputGroup.Text className="bg-light fw-bold w-100 justify-content-center" style={{ height: '38px' }}>
+                {buscandoRut ? <Spinner animation="border" size="sm" className="text-primary" role="status" /> : (dv || '-')}
+              </InputGroup.Text>
+            </InputGroup>
+          </Col>
+          <Col md={6} className="d-flex align-items-end">
             {bloqueado && (
-              <button type="button" className="btn btn-outline-danger fw-semibold px-3 w-100 w-md-auto" onClick={handleLimpiarFormulario}>
+              <Button type="button" variant="outline-danger" className="fw-semibold px-3 w-100 w-md-auto" onClick={handleLimpiarFormulario}>
                 <i className="bi bi-arrow-counterclockwise me-1"></i> Cambiar RUT o Funcionario
-              </button>
+              </Button>
             )}
-          </div>
+          </Col>
 
           {bloqueado && (
-            <div className="col-12 my-2 animate__animated animate__fadeIn">
-              <div className="alert alert-info border-0 shadow-sm d-flex align-items-center m-0 py-2 px-3 small">
+            <Col xs={12} className="my-2 animate__animated animate__fadeIn">
+              <Alert variant="info" className="border-0 shadow-sm d-flex align-items-center m-0 py-2 px-3 small">
                 <i className="bi bi-shield-lock-fill text-info fs-5 me-2"></i>
                 <div>
                   <strong>Funcionario Vinculado:</strong> Los datos de identidad están resguardados en el archivo maestro. Presiona <u>Continuar con Contrato</u> para abrir la sección contractual.
                 </div>
-              </div>
-            </div>
+              </Alert>
+            </Col>
           )}
 
           {/* CAMPO: NOMBRES */}
-          <div className="col-md-6">
-            <label className="form-label small fw-bold text-secondary">Nombres</label>
-            <div className="input-group">
+          <Col md={6}>
+            <Form.Label className="small fw-bold text-secondary">Nombres</Form.Label>
+            <InputGroup>
               {bloqueado && (
-                <span className="input-group-text bg-light text-muted border-end-0">
+                <InputGroup.Text className="bg-light text-muted border-end-0">
                   <i className="bi bi-lock-fill"></i>
-                </span>
+                </InputGroup.Text>
               )}
-              <input 
-                type="text" 
-                className={`form-control text-uppercase ${bloqueado ? 'bg-light text-muted border-start-0' : ''}`} 
-                value={nombres} 
-                onChange={(e) => setNombres(e.target.value)} 
-                readOnly={bloqueado} 
-                required 
+              <Form.Control
+                type="text"
+                className={`text-uppercase ${bloqueado ? 'bg-light text-muted border-start-0' : ''}`}
+                value={nombres}
+                onChange={(e) => setNombres(e.target.value)}
+                readOnly={bloqueado}
+                required
               />
-            </div>
-          </div>
+            </InputGroup>
+          </Col>
 
           {/* CAMPO: APELLIDO PATERNO */}
-          <div className="col-md-6">
-            <label className="form-label small fw-bold text-secondary">Apellido Paterno</label>
-            <div className="input-group">
+          <Col md={6}>
+            <Form.Label className="small fw-bold text-secondary">Apellido Paterno</Form.Label>
+            <InputGroup>
               {bloqueado && (
-                <span className="input-group-text bg-light text-muted border-end-0">
+                <InputGroup.Text className="bg-light text-muted border-end-0">
                   <i className="bi bi-lock-fill"></i>
-                </span>
+                </InputGroup.Text>
               )}
-              <input 
-                type="text" 
-                className={`form-control text-uppercase ${bloqueado ? 'bg-light text-muted border-start-0' : ''}`} 
-                value={primerApellido} 
-                onChange={(e) => setPrimerApellido(e.target.value)} 
-                readOnly={bloqueado} 
-                required 
+              <Form.Control
+                type="text"
+                className={`text-uppercase ${bloqueado ? 'bg-light text-muted border-start-0' : ''}`}
+                value={primerApellido}
+                onChange={(e) => setPrimerApellido(e.target.value)}
+                readOnly={bloqueado}
+                required
               />
-            </div>
-          </div>
+            </InputGroup>
+          </Col>
 
           {/* CAMPO: APELLIDO MATERNO */}
-          <div className="col-md-6">
-            <label className="form-label small fw-bold text-secondary">Apellido Materno</label>
-            <div className="input-group">
+          <Col md={6}>
+            <Form.Label className="small fw-bold text-secondary">Apellido Materno</Form.Label>
+            <InputGroup>
               {bloqueado && (
-                <span className="input-group-text bg-light text-muted border-end-0">
+                <InputGroup.Text className="bg-light text-muted border-end-0">
                   <i className="bi bi-lock-fill"></i>
-                </span>
+                </InputGroup.Text>
               )}
-              <input 
-                type="text" 
-                className={`form-control text-uppercase ${bloqueado ? 'bg-light text-muted border-start-0' : ''}`} 
-                value={segundoApellido} 
-                onChange={(e) => setSegundoApellido(e.target.value)} 
-                readOnly={bloqueado} 
+              <Form.Control
+                type="text"
+                className={`text-uppercase ${bloqueado ? 'bg-light text-muted border-start-0' : ''}`}
+                value={segundoApellido}
+                onChange={(e) => setSegundoApellido(e.target.value)}
+                readOnly={bloqueado}
               />
-            </div>
-          </div>
-        </div>
+            </InputGroup>
+          </Col>
+        </Row>
 
         {/* CONTROL DE FLUJO DINÁMICO (UX) */}
         {!mostrarContrato && (
           <div className="d-flex justify-content-end gap-2 pt-3 border-top">
-            <button type="button" className="btn btn-outline-secondary px-4 small" onClick={handleLimpiarFormulario}>Limpiar Todo</button>
-            <button 
-              type="button" 
-              className="btn btn-primary px-4 fw-bold"
+            <Button type="button" variant="outline-secondary" className="px-4 small" onClick={handleLimpiarFormulario}>Limpiar Todo</Button>
+            <Button
+              type="button"
+              variant="primary"
+              className="px-4 fw-bold"
               disabled={!rut || buscandoRut}
               onClick={() => {
                 setMostrarContrato(true);
@@ -302,64 +304,64 @@ export default function FormularioTrabajador() {
               }}
             >
               {existeTrabajador ? 'Continuar con Contrato →' : 'Configurar Contrato →'}
-            </button>
+            </Button>
           </div>
         )}
 
         {/* SECCIÓN 2: ESTRUCTURA CONTRACTUAL */}
         {mostrarContrato && (
-          <form onSubmit={handleGuardarFormulario} className="animate__animated animate__fadeIn mt-5">
+          <Form onSubmit={handleGuardarFormulario} className="animate__animated animate__fadeIn mt-5">
             <h6 className="text-secondary border-bottom pb-2 mb-4 fw-bold text-uppercase d-flex align-items-center">
               <span className="bg-primary text-white rounded-circle d-inline-flex justify-content-center align-items-center me-2" style={{ width: '24px', height: '24px', fontSize: '12px' }}>2</span>
               Estructura Contractual
             </h6>
-            
-            <div className="row g-3 mb-4">
-              <div className="col-md-3">
-                <label className="form-label small fw-semibold">Jornada Semanal</label>
-                <div className="input-group">
-                  <input type="number" className="form-control" value={jornada} onChange={(e) => setJornada(e.target.value)} required />
-                  <span className="input-group-text bg-light text-muted">Hrs.</span>
-                </div>
-              </div>
-              
-              <div className="col-md-4">
-                <label className="form-label small fw-semibold">Sueldo Base Bruto</label>
-                <div className="input-group">
-                  <span className="input-group-text bg-light text-muted">$</span>
-                  <input type="number" className="form-control" placeholder="650000" value={sueldoBase} onChange={(e) => setSueldoBase(e.target.value)} required />
-                </div>
-              </div>
-              
-              <div className="col-md-5 d-none d-md-block"></div>
 
-              <div className="col-md-4">
-                <label className="form-label small fw-semibold">Fecha de Inicio</label>
-                <input type="date" className="form-control" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required />
-              </div>
-              
-              <div className="col-md-4">
-                <label className="form-label small fw-semibold">Fecha de Término</label>
-                <input type="date" className="form-control" value={fechaTermino} onChange={(e) => setFechaTermino(e.target.value)} />
-                <div className="form-text" style={{ fontSize: '0.75rem' }}>Dejar vacío si es indefinido.</div>
-              </div>
-            </div>
+            <Row className="g-3 mb-4">
+              <Col md={3}>
+                <Form.Label className="small fw-semibold">Jornada Semanal</Form.Label>
+                <InputGroup>
+                  <Form.Control type="number" value={jornada} onChange={(e) => setJornada(e.target.value)} required />
+                  <InputGroup.Text className="bg-light text-muted">Hrs.</InputGroup.Text>
+                </InputGroup>
+              </Col>
+
+              <Col md={4}>
+                <Form.Label className="small fw-semibold">Sueldo Base Bruto</Form.Label>
+                <InputGroup>
+                  <InputGroup.Text className="bg-light text-muted">$</InputGroup.Text>
+                  <Form.Control type="number" placeholder="650000" value={sueldoBase} onChange={(e) => setSueldoBase(e.target.value)} required />
+                </InputGroup>
+              </Col>
+
+              <Col md={5} className="d-none d-md-block"></Col>
+
+              <Col md={4}>
+                <Form.Label className="small fw-semibold">Fecha de Inicio</Form.Label>
+                <Form.Control type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required />
+              </Col>
+
+              <Col md={4}>
+                <Form.Label className="small fw-semibold">Fecha de Término</Form.Label>
+                <Form.Control type="date" value={fechaTermino} onChange={(e) => setFechaTermino(e.target.value)} />
+                <Form.Text style={{ fontSize: '0.75rem' }}>Dejar vacío si es indefinido.</Form.Text>
+              </Col>
+            </Row>
 
             <div className="d-flex flex-column flex-sm-row gap-3 pt-3 border-top">
-              <button type="submit" className="btn btn-success px-4 py-2 fw-bold" disabled={loading}>
+              <Button type="submit" variant="success" className="px-4 py-2 fw-bold" disabled={loading}>
                 {loading ? (
-                  <><span className="spinner-border spinner-border-sm me-2"></span> Registrando...</>
+                  <><Spinner animation="border" size="sm" className="me-2" /> Registrando...</>
                 ) : (
                   <><i className="bi bi-save-fill me-2"></i> Guardar Historial Contractual</>
                 )}
-              </button>
-              <button type="button" className="btn btn-outline-secondary px-4 py-2 fw-semibold" onClick={() => setMostrarContrato(false)} disabled={loading}>
+              </Button>
+              <Button type="button" variant="outline-secondary" className="px-4 py-2 fw-semibold" onClick={() => setMostrarContrato(false)} disabled={loading}>
                 ← Volver a Identidad
-              </button>
+              </Button>
             </div>
-          </form>
+          </Form>
         )}
-      </div>
-    </div>
+      </Card.Body>
+    </Card>
   );
 }

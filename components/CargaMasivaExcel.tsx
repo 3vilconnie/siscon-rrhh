@@ -3,6 +3,7 @@ import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
+import { Card, Button, Spinner } from 'react-bootstrap';
 
 interface ArchivoPrevia {
   id: string;
@@ -170,12 +171,12 @@ export default function CargaMasivaExcel() {
   };
 
   return (
-    <div className="card shadow-sm border-0 bg-white mx-auto w-100" style={{ maxWidth: '800px' }}>
-      <div className="card-header bg-dark text-white fw-bold d-flex align-items-center">
+    <Card className="shadow-sm border-0 bg-white mx-auto w-100" style={{ maxWidth: '800px' }}>
+      <Card.Header className="bg-dark text-white fw-bold d-flex align-items-center">
         <i className="bi bi-cloud-arrow-up-fill me-2 fs-5 text-primary"></i> Procesador Masivo de Reportes SIGPER
-      </div>
-      
-      <div className="card-body p-4 p-md-5">
+      </Card.Header>
+
+      <Card.Body className="p-4 p-md-5">
         <div 
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -205,9 +206,9 @@ export default function CargaMasivaExcel() {
             <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
               <h6 className="fw-bold text-secondary m-0">Cola de archivos listos para procesar ({archivos.length})</h6>
               {!procesando && (
-                <button className="btn btn-link btn-sm text-danger text-decoration-none p-0 small fw-semibold" onClick={() => setArchivos([])}>
+                <Button variant="link" size="sm" className="text-danger text-decoration-none p-0 small fw-semibold" onClick={() => setArchivos([])}>
                   Vaciar Cola
-                </button>
+                </Button>
               )}
             </div>
 
@@ -224,7 +225,7 @@ export default function CargaMasivaExcel() {
                   <div className="d-flex align-items-center gap-3 text-truncate" style={{ maxWidth: '75%' }}>
                     {item.estado === 'exito' && <i className="bi bi-check-circle-fill text-success fs-5"></i>}
                     {item.estado === 'error' && <i className="bi bi-x-circle-fill text-danger fs-5"></i>}
-                    {item.estado === 'procesando' && <span className="spinner-border spinner-border-sm text-primary" role="status"></span>}
+                    {item.estado === 'procesando' && <Spinner animation="border" size="sm" className="text-primary" role="status" />}
                     {item.estado === 'pendiente' && <i className="bi bi-file-earmark-arrow-up text-secondary fs-5"></i>}
                     
                     <div className="text-truncate">
@@ -235,14 +236,16 @@ export default function CargaMasivaExcel() {
                   </div>
 
                   {!procesando && item.estado === 'pendiente' && (
-                    <button 
-                      type="button" 
-                      className="btn btn-sm btn-outline-danger border-0 p-1 rounded-circle"
+                    <Button
+                      type="button"
+                      variant="outline-danger"
+                      size="sm"
+                      className="border-0 p-1 rounded-circle"
                       onClick={() => removerArchivo(item.id)}
                       title="Quitar de la lista"
                     >
                       <i className="bi bi-trash3-fill"></i>
-                    </button>
+                    </Button>
                   )}
                 </div>
               ))}
@@ -250,22 +253,23 @@ export default function CargaMasivaExcel() {
 
             {/* BOTÓN DISPARADOR DE CARGA */}
             <div className="d-flex justify-content-end mt-4 pt-3 border-top">
-              <button 
-                type="button" 
-                className="btn btn-success fw-bold px-4 py-2"
+              <Button
+                type="button"
+                variant="success"
+                className="fw-bold px-4 py-2"
                 onClick={handleProcesarBloque}
                 disabled={procesando || archivos.filter(a => a.estado === 'pendiente').length === 0}
               >
                 {procesando ? (
-                  <><span className="spinner-border spinner-border-sm me-2"></span> Sincronizando Bloque...</>
+                  <><Spinner animation="border" size="sm" className="me-2" /> Sincronizando Bloque...</>
                 ) : (
                   <><i className="bi bi-play-circle-fill me-2"></i> Iniciar Inserción Masiva</>
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </Card.Body>
+    </Card>
   );
 }

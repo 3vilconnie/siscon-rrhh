@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import { Form, Button } from 'react-bootstrap';
 
 interface MensajeChat {
   rol: 'user' | 'assistant';
@@ -177,16 +178,18 @@ export default function AiChatSidebar() {
                 <span className="text-muted d-block mb-2 font-monospace" style={{ fontSize: '10px' }}>💡 CONSULTAS RÁPIDAS SUGERIDAS:</span>
                 <div className="d-flex flex-column gap-2">
                   {sugerenciasIniciales.map((sug, i) => (
-                    <button
+                    <Button
                       key={i}
+                      variant="light"
+                      size="sm"
                       type="button"
                       onClick={() => realizarConsultaChat(sug.query)}
-                      className="btn btn-sm btn-white text-start border shadow-sm p-2 bg-white burbuja-sugerencia text-secondary fw-medium transition-all"
+                      className="text-start border shadow-sm p-2 bg-white burbuja-sugerencia text-secondary fw-medium transition-all"
                       style={{ fontSize: '11px', borderRadius: '8px' }}
                     >
                       <i className="bi bi-chat-left-text me-2 text-primary"></i>
                       {sug.titulo}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -210,25 +213,28 @@ export default function AiChatSidebar() {
           </div>
 
           {/* Input de Texto Inferior */}
-          <form onSubmit={handleEnviar} className="p-2 border-top bg-white d-flex gap-2 align-items-center">
-            <input 
-              type="text" 
-              className="form-control form-control-sm border-0 bg-light"
+          <Form onSubmit={handleEnviar} className="p-2 border-top bg-white d-flex gap-2 align-items-center">
+            <Form.Control
+              type="text"
+              size="sm"
+              className="border-0 bg-light"
               placeholder={isTyping ? "Esperando respuesta..." : "Ej: ¿Cuántos contratos tiene Carmen Zuñiga?"}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={isTyping}
               style={{ borderRadius: '20px', paddingLeft: '15px' }}
             />
-            <button 
-              type="submit" 
-              className="btn btn-sm btn-primary rounded-circle d-flex justify-content-center align-items-center"
+            <Button
+              type="submit"
+              size="sm"
+              variant="primary"
+              className="rounded-circle d-flex justify-content-center align-items-center"
               style={{ width: '32px', height: '32px', minWidth: '32px' }}
               disabled={isTyping || !input.trim()}
             >
               <i className="bi bi-send-fill" style={{ marginLeft: '-2px' }}></i>
-            </button>
-          </form>
+            </Button>
+          </Form>
 
         </div>
       </div>

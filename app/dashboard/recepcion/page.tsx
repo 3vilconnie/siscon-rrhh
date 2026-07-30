@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
+import { Card, Row, Col, Form, Table, Button, Spinner } from "react-bootstrap";
 import { Trabajador, DetalleDocumento} from "@/types";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -18,6 +19,7 @@ export default function ModuloRecepcionDocumentos() {
   const [detalleDocumento, setDetalleDocumento] = useState("");
   const [recibe, setRecibe] = useState("");
   const [entrega, setEntrega] = useState("");
+  const [loadingDoc, setLoadingDoc] = useState<boolean>(false);
   const pdfRef = useRef<HTMLDivElement>(null);
 
   // Estado para manejar las filas de la tabla dinámicamente
@@ -69,12 +71,36 @@ export default function ModuloRecepcionDocumentos() {
 
   }
 
-  const eliminarFila = (id : number) => {
-    const nuevoDetalles = detalles.filter(d => d.id != id);
+const eliminarFila = (id: number) => {
+  // 1) Guardo la fila y su posición ANTES de borrar, para poder restaurarla
+  const index = detalles.findIndex(d => d.id === id);
+  if (index === -1) return;
+  const filaEliminada = detalles[index];
 
-    setDetalles(nuevoDetalles);
-    toast.success(`Fila eliminada.`);
-  };
+  // 2) Elimino
+  setDetalles(prev => prev.filter(d => d.id !== id));
+
+  // 3) Toast con acción "Deshacer"
+  toast((t) => (
+    <span className="d-flex align-items-center gap-3">
+      Fila eliminada.
+      <button
+        className="btn btn-sm btn-outline-primary"
+        onClick={() => {
+          // Reinserto la fila en su posición original
+          setDetalles(prev => {
+            const copia = [...prev];
+            copia.splice(index, 0, filaEliminada);
+            return copia;
+          });
+          toast.dismiss(t.id);
+        }}
+      >
+        Deshacer
+      </button>
+    </span>
+  ), { duration: 5000 });
+};
 
   // Función que busca al trabajador cuando el usuario sale del input de RUT
   const buscarTrabajador = (index: number) => {
@@ -103,6 +129,7 @@ export default function ModuloRecepcionDocumentos() {
   };
 
   const generarPDF = async () => {
+
     if(tiposSeleccionados.length == 0) return toast.error("Debe seleccionar un tipo de documento.");
     if(!detalleDocumento) return toast.error("Debe ingresar descripción documento.");
     if(detalles.length == 0) return toast.error("No puede generar un documento sin detalle");
@@ -112,6 +139,7 @@ export default function ModuloRecepcionDocumentos() {
     if(!recibe) return toast.error("Debe ingresar el receptor.");
 
     try {
+      setLoadingDoc(true);
     const canvas = await html2canvas(elemento, {
       scale: 2,
       useCORS: true,
@@ -144,6 +172,8 @@ export default function ModuloRecepcionDocumentos() {
       toast.success("Documento generado con éxito.");
     } catch (error) {
       toast.error("Hubo un error al generar el PDF");
+    }finally{
+      setLoadingDoc(false);
     }
   };
 
@@ -151,47 +181,45 @@ export default function ModuloRecepcionDocumentos() {
     fetchTrabajadores();
   },[]);
 
-  if (loading) return <div className="spinner-border" role="status"></div>
+  if (loading) return <Spinner animation="border" role="status" />
 
   return (
     <div className="container my-5">
-      <div className="card shadow-sm border-0">
-        <div className="card-body p-4 p-md-5" ref={pdfRef} style={{ minHeight: '297mm' }}>
-          <div className="row mb-5">
+      <Card className="shadow-sm border-0">
+        <Card.Body className="p-4 p-md-5" ref={pdfRef} style={{ minHeight: '297mm' }}>
+          <Row className="mb-5">
             <header>
               <img src={logoGobierno.src} style={{width:"8.59cm"}} /> <br/>
               CORPORACION NACIONAL FORESTAL <br/>
               REGIÓN DE ARICA Y PARINACOTA <br/>
               DEPTO. FINANZAS Y ADMINISTRACIÓN <br/>
               SECCIÓN RECURSOS HUMANOS <br/>
-              CDC/JAN/crh 
+              CDC/JAN/crh
             </header>
-          </div>
+          </Row>
           <h3 className="text-center fw-bold mb-5">Formulario Recepción de Documentos</h3>
 
           {/* SECCIÓN 1: Tipos de Documentos e Información General */}
-          <div className="row mb-5 pb-4 border-bottom">
-            <div className="col-12 col-md-6 mb-4 mb-md-0">
+          <Row className="mb-5 pb-4 border-bottom">
+            <Col xs={12} md={6} className="mb-4 mb-md-0">
               <h5 className="fw-semibold mb-3">Tipo(s) de Documento adjunto:</h5>
               <div className="d-flex flex-column gap-2">
                 {['Finiquito', 'Contrato', 'Anexo contrato', 'Notificación', 'Otro'].map((tipo) => (
-                  <div key={tipo} className="form-check">
-                    <input 
-                      className="form-check-input" 
-                      type="checkbox" 
+                  <div key={tipo}>
+                    <Form.Check
+                      type="checkbox"
                       id={`check-${tipo.replace(/\s+/g, '-')}`}
+                      label={tipo}
                       checked={tiposSeleccionados.includes(tipo)}
                       onChange={() => handleTipoToggle(tipo)}
                       style={{ cursor: 'pointer' }}
                     />
-                    <label className="form-check-label" htmlFor={`check-${tipo.replace(/\s+/g, '-')}`} style={{ cursor: 'pointer' }}>
-                      {tipo}
-                    </label>
-                    
+
                     {tipo === 'Otro' && tiposSeleccionados.includes('Otro') && (
-                      <input
+                      <Form.Control
                         type="text"
-                        className="form-control form-control-sm mt-2 w-75 border-top-0 border-end-0 border-start-0 rounded-0 bg-light"
+                        size="sm"
+                        className="mt-2 w-75 border-top-0 border-end-0 border-start-0 rounded-0 bg-light"
                         placeholder="Especifique el tipo de documento..."
                         value={detalleOtro}
                         onChange={(e) => setDetalleOtro(e.target.value)}
@@ -202,40 +230,44 @@ export default function ModuloRecepcionDocumentos() {
                   </div>
                 ))}
               </div>
-            </div>
+            </Col>
 
-            <div className="col-12 col-md-6">
-              <div className="mb-3">
-                <label className="form-label fw-medium text-secondary">Fecha de Recepción</label>
-                <input type="date" className="form-control shadow-sm" value={fechaRecepcion} onChange={e=>setFechaRecepcion(e.target.value)} />
-              </div>
-              <div className="mb-3">
-                <label className="form-label fw-medium text-secondary">Cantidad / Descripción general</label>
-                <input type="text" 
-                className="form-control shadow-sm" 
-                placeholder="Ej: 4 Contratos rectificados, 1 copia" 
-                value={detalleDocumento}
-                onChange={e=>setDetalleDocumento(e.target.value)}
-                 />
-              </div>
-            </div>
-          </div>
+            <Col xs={12} md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-medium text-secondary">Fecha de Recepción</Form.Label>
+                <Form.Control type="date" className="shadow-sm" value={fechaRecepcion} onChange={e=>setFechaRecepcion(e.target.value)} />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-medium text-secondary">Cantidad / Descripción general</Form.Label>
+                <Form.Control
+                  type="text"
+                  className="shadow-sm"
+                  placeholder="Ej: 4 Contratos rectificados, 1 copia"
+                  value={detalleDocumento}
+                  onChange={e=>setDetalleDocumento(e.target.value)}
+                />
+              </Form.Group>
+            </Col>
+          </Row>
 
           {/* SECCIÓN 2: Detalle de los Documentos (Tabla) */}
           <div>
             <div className="mb-5 pb-4 border-bottom w-100">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h5 className="fw-semibold m-0">Detalle</h5>
-                <button type="button" 
-                onClick={agregarFila} 
-                className="btn btn-primary btn-sm px-3 shadow-sm"
-                data-html2canvas-ignore="true"
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={agregarFila}
+                  className="px-3 shadow-sm"
+                  data-html2canvas-ignore="true"
                 >
                   + Añadir Fila
-                </button>
+                </Button>
               </div>
               <div className="table-responsive">
-                <table className="table table-bordered table-hover align-middle text-nowrap mb-0">
+                <Table bordered hover className="align-middle text-nowrap mb-0">
                   <thead style={{ backgroundColor: '#8b0000', color: 'white' }}>
                     <tr>
                       <th className="py-2 fw-normal">FECHA EMISIÓN</th>
@@ -253,85 +285,91 @@ export default function ModuloRecepcionDocumentos() {
                     {detalles.length == 0 ? <tr><td colSpan={9}><span className="d-flex text-muted justify-content-center my-3">Aún no ingresas datos.</span></td></tr> : detalles.map((fila, index) => (
                       <tr key={fila.id}>
                         <td className="p-1">
-                          <input type="date" value={fila.fechaEmision} onChange={(e) => handleInputChange(index, 'fechaEmision', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" />
+                          <Form.Control type="date" size="sm" value={fila.fechaEmision} onChange={(e) => handleInputChange(index, 'fechaEmision', e.target.value)} className="border-0 bg-transparent shadow-none" />
                         </td>
                         <td className="p-1">
-                          <input type="text" value={fila.cabecera} onChange={(e) => handleInputChange(index, 'cabecera', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" placeholder="PZD1" />
+                          <Form.Control type="text" size="sm" value={fila.cabecera} onChange={(e) => handleInputChange(index, 'cabecera', e.target.value)} className="border-0 bg-transparent shadow-none" placeholder="PZD1" />
                         </td>
                         <td className="p-1">
-                          <input 
-                            type="text" 
-                            value={fila.rut} 
-                            onChange={(e) => handleInputChange(index, 'rut', e.target.value)} 
+                          <Form.Control
+                            type="text"
+                            size="sm"
+                            value={fila.rut}
+                            onChange={(e) => handleInputChange(index, 'rut', e.target.value)}
                             onBlur={() => buscarTrabajador(index)} // <-- AQUÍ SE DISPARA LA BÚSQUEDA AL SALIR DEL INPUT
-                            className="form-control form-control-sm border-0 bg-transparent shadow-none" 
-                            placeholder="20910472" 
+                            className="border-0 bg-transparent shadow-none"
+                            placeholder="20910472"
                           />
                         </td>
                         <td className="p-1 text-center">
-                          <input type="text" value={fila.dv} onChange={(e) => handleInputChange(index, 'dv', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none text-center d-inline-block" placeholder="5" maxLength={1} style={{ width: '40px' }} />
+                          <Form.Control type="text" size="sm" value={fila.dv} onChange={(e) => handleInputChange(index, 'dv', e.target.value)} className="border-0 bg-transparent shadow-none text-center d-inline-block" placeholder="5" maxLength={1} style={{ width: '40px' }} />
                         </td>
                         <td className="p-1">
-                          <input type="text" value={fila.nombre} onChange={(e) => handleInputChange(index, 'nombre', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" placeholder="Nombre" />
+                          <Form.Control type="text" size="sm" value={fila.nombre} onChange={(e) => handleInputChange(index, 'nombre', e.target.value)} className="border-0 bg-transparent shadow-none" placeholder="Nombre" />
                         </td>
                         <td className="p-1">
-                          <input type="text" value={fila.apellidoP} onChange={(e) => handleInputChange(index, 'apellidoP', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" placeholder="Apellido P" />
+                          <Form.Control type="text" size="sm" value={fila.apellidoP} onChange={(e) => handleInputChange(index, 'apellidoP', e.target.value)} className="border-0 bg-transparent shadow-none" placeholder="Apellido P" />
                         </td>
                         <td className="p-1">
-                          <input type="text" value={fila.apellidoM ?? ""} onChange={(e) => handleInputChange(index, 'apellidoM', e.target.value)} className="form-control form-control-sm border-0 bg-transparent shadow-none" placeholder="Apellido M" />
+                          <Form.Control type="text" size="sm" value={fila.apellidoM ?? ""} onChange={(e) => handleInputChange(index, 'apellidoM', e.target.value)} className="border-0 bg-transparent shadow-none" placeholder="Apellido M" />
                         </td>
                         <td className="p-1">
-                          <select value={fila.genero} onChange={(e) => handleInputChange(index, 'genero', e.target.value)} className="form-select form-select-sm border-0 bg-transparent shadow-none">
+                          <Form.Select size="sm" value={fila.genero} onChange={(e) => handleInputChange(index, 'genero', e.target.value)} className="border-0 bg-transparent shadow-none">
                             <option value="SR">S/R</option>
                             <option value="M">M</option>
                             <option value="F">F</option>
-                          </select>
+                          </Form.Select>
                         </td>
                         <td className="p-1" data-html2canvas-ignore="true">
-                          <button className="btn btn-danger" onClick={e=>eliminarFila(fila.id)} title="Eliminar fila"><span className="bi bi-trash text-light"></span></button>
+                          <Button variant="danger" onClick={e=>eliminarFila(fila.id)} title="Eliminar fila"><span className="bi bi-trash text-light"></span></Button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </Table>
               </div>
             </div>
 
             {/* SECCIÓN 3: Responsables */}
-            <div className="row text-center pt-2 w-100">
-              <div className="col-12 col-md-6 mb-4 mb-md-0">
-                <input type="text" 
-                className="form-control text-center text-uppercase fw-medium mx-auto mb-1 border-bottom-0 border-end-0 border-start-0 rounded-0 bg-transparent" 
-                placeholder="RUT o Nombre de quien entrega" 
-                style={{ width: '75%', borderTop: '2px solid #6c757d', boxShadow: 'none' }}
-                onChange={e => {buscarNombre(e as any, e.target.value); setEntrega(e.target.value)}}
+            <Row className="text-center pt-2 w-100">
+              <Col xs={12} md={6} className="mb-4 mb-md-0">
+                <Form.Control
+                  type="text"
+                  className="text-center text-uppercase fw-medium mx-auto mb-1 border-bottom-0 border-end-0 border-start-0 rounded-0 bg-transparent"
+                  placeholder="RUT o Nombre de quien entrega"
+                  style={{ width: '75%', borderTop: '2px solid #6c757d', boxShadow: 'none' }}
+                  onChange={e => {buscarNombre(e as any, e.target.value); setEntrega(e.target.value)}}
                 />
                 <span className="text-muted small">Entrega</span>
-              </div>
-              <div className="col-12 col-md-6">
-                <input type="text" 
-                className="form-control text-center text-uppercase fw-medium mx-auto mb-1 border-bottom-0 border-end-0 border-start-0 rounded-0 bg-transparent" 
-                placeholder="RUT o Nombre de quien recibe" 
-                style={{ width: '75%', borderTop: '2px solid #6c757d', boxShadow: 'none' }} 
-                onChange={(e) => {buscarNombre(e as any, e.target.value); setRecibe(e.target.value)}}
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Control
+                  type="text"
+                  className="text-center text-uppercase fw-medium mx-auto mb-1 border-bottom-0 border-end-0 border-start-0 rounded-0 bg-transparent"
+                  placeholder="RUT o Nombre de quien recibe"
+                  style={{ width: '75%', borderTop: '2px solid #6c757d', boxShadow: 'none' }}
+                  onChange={(e) => {buscarNombre(e as any, e.target.value); setRecibe(e.target.value)}}
                 />
                 <span className="text-muted small">Recibe</span>
-              </div>
-            </div>
+              </Col>
+            </Row>
           </div>
 
           {/* Acciones */}
           <div className="d-flex justify-content-end align-items-end mt-5">
-            <button type="button" 
-            className="btn btn-success px-4 py-2 shadow-sm"
-            onClick={generarPDF}
-            data-html2canvas-ignore="true"
+            <Button
+              type="button"
+              variant="success"
+              className="px-4 py-2 shadow-sm"
+              onClick={generarPDF}
+              data-html2canvas-ignore="true"
+              disabled={loadingDoc}
             >
-              Guardar Documento
-            </button>
+              {loadingDoc ? "Cargando..." : "Guardar Documento"}
+            </Button>
           </div>
-        </div>
-      </div>
+        </Card.Body>
+      </Card>
     </div>
   );
 }

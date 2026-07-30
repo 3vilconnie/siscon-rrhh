@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { Card, Table, Badge, Button, Form, InputGroup, Spinner } from 'react-bootstrap';
 import Pagination from '@/components/Pagination';
 import { Trabajador } from '@/types';
 
@@ -150,24 +151,24 @@ export default function NominatrabajadoresPage() {
           <h2 className="fw-bold text-dark m-0">Nómina de Trabajadores</h2>
           <p className="text-muted small">Visualización general del personal y estado contractual.</p>
         </div>
-        <Link href="/dashboard/formulario" className="btn btn-primary fw-bold small">
+        <Button as={Link as any} href="/dashboard/formulario" variant="primary" className="fw-bold small">
           <i className="bi bi-person-plus-fill me-1"></i> Nuevo Trabajador
-        </Link>
+        </Button>
       </div>
 
       {/* BARRA DE BÚSQUEDA OPTIMIZADA CON SPINNER */}
       <div className="mb-3">
-        <div className="input-group shadow-sm">
-          <span className="input-group-text bg-white border-end-0 text-muted">
+        <InputGroup className="shadow-sm">
+          <InputGroup.Text className="bg-white border-end-0 text-muted">
             {estaFiltrando ? (
-              <span className="spinner-border spinner-border-sm text-primary" role="status"></span>
+              <Spinner animation="border" size="sm" className="text-primary" role="status" />
             ) : (
               <i className="bi bi-search"></i>
             )}
-          </span>
-          <input
+          </InputGroup.Text>
+          <Form.Control
             type="text"
-            className="form-control border-start-0"
+            className="border-start-0"
             placeholder="Buscar por RUT, Nombre o Apellidos..."
             value={busqueda}
             onChange={(e) => {
@@ -175,36 +176,44 @@ export default function NominatrabajadoresPage() {
               setPaginaActual(1);
             }}
           />
-        </div>
+        </InputGroup>
       </div>
 
       {/* UX: PILLS DE FILTRADO RÁPIDO */}
       <div className="d-flex flex-wrap gap-2 mb-4 align-items-center">
         <span className="text-secondary small fw-bold me-1">Segmentar por:</span>
-        <button 
+        <Button
+          size="sm"
+          variant={filtoRapido === 'todos' ? 'dark' : 'outline-secondary'}
           onClick={() => { setFiltroRapido('todos'); setPaginaActual(1); }}
-          className={`btn btn-sm rounded-pill px-3 fw-semibold ${filtoRapido === 'todos' ? 'btn-dark' : 'btn-outline-secondary'}`}
+          className="rounded-pill px-3 fw-semibold"
         >
           Todos ({trabajadores.length})
-        </button>
-        <button 
+        </Button>
+        <Button
+          size="sm"
+          variant={filtoRapido === 'unico' ? 'info' : 'outline-info'}
           onClick={() => { setFiltroRapido('unico'); setPaginaActual(1); }}
-          className={`btn btn-sm rounded-pill px-3 fw-semibold ${filtoRapido === 'unico' ? 'btn-info text-dark' : 'btn-outline-info'}`}
+          className={`rounded-pill px-3 fw-semibold ${filtoRapido === 'unico' ? 'text-dark' : ''}`}
         >
           Contrato Único ({trabajadores.filter(t => t.num_contratos === 1).length})
-        </button>
-        <button 
+        </Button>
+        <Button
+          size="sm"
+          variant={filtoRapido === 'alerta' ? 'warning' : 'outline-warning'}
           onClick={() => { setFiltroRapido('alerta'); setPaginaActual(1); }}
-          className={`btn btn-sm rounded-pill px-3 fw-semibold ${filtoRapido === 'alerta' ? 'btn-warning text-dark' : 'btn-outline-warning'}`}
+          className={`rounded-pill px-3 fw-semibold ${filtoRapido === 'alerta' ? 'text-dark' : ''}`}
         >
           En Alerta (2) ({trabajadores.filter(t => t.num_contratos === 2).length})
-        </button>
-        <button 
+        </Button>
+        <Button
+          size="sm"
+          variant={filtoRapido === 'critico' ? 'danger' : 'outline-danger'}
           onClick={() => { setFiltroRapido('critico'); setPaginaActual(1); }}
-          className={`btn btn-sm rounded-pill px-3 fw-semibold ${filtoRapido === 'critico' ? 'btn-danger' : 'btn-outline-danger'}`}
+          className="rounded-pill px-3 fw-semibold"
         >
           Críticos (3+) ({trabajadores.filter(t => (t.num_contratos || 0) >= 3).length})
-        </button>
+        </Button>
       </div>
 
       <div className="d-flex justify-content-between align-items-center mb-3 small text-muted">
@@ -216,8 +225,9 @@ export default function NominatrabajadoresPage() {
         
         <div className="d-flex align-items-center gap-2">
           <span>Mostrar:</span>
-          <select
-            className="form-select form-select-sm shadow-sm"
+          <Form.Select
+            size="sm"
+            className="shadow-sm"
             style={{ width: '80px' }}
             value={registrosPorPagina}
             onChange={(e) => {
@@ -229,13 +239,13 @@ export default function NominatrabajadoresPage() {
             <option value={10}>10</option>
             <option value={15}>15</option>
             <option value={20}>20</option>
-          </select>
+          </Form.Select>
         </div>
       </div>
 
-      <div className="card shadow-sm border-0 bg-white overflow-hidden mb-4">
+      <Card className="shadow-sm border-0 bg-white overflow-hidden mb-4">
         <div className="table-responsive">
-          <table className="table table-hover align-middle m-0">
+          <Table hover className="align-middle m-0">
             <thead className="table-dark text-uppercase small user-select-none">
               <tr>
                 <th className="px-3 py-3" style={{ width: '15%', cursor: 'pointer' }} onClick={() => handleSort('rut')}>
@@ -267,12 +277,14 @@ export default function NominatrabajadoresPage() {
                     <i className="bi bi-person-x display-4 text-secondary mb-3 d-block"></i>
                     <h5 className="fw-bold text-dark mb-1">No se encontraron resultados</h5>
                     <p className="small text-muted mb-3">Ningún trabajador coincide con los criterios o filtros actuales.</p>
-                    <button 
-                      className="btn btn-sm btn-outline-secondary fw-semibold rounded-pill px-3"
+                    <Button
+                      size="sm"
+                      variant="outline-secondary"
+                      className="fw-semibold rounded-pill px-3"
                       onClick={() => { setBusqueda(''); setFiltroRapido('todos'); }}
                     >
                       Limpiar Filtros
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ) : (
@@ -288,17 +300,17 @@ export default function NominatrabajadoresPage() {
                       </span>
                     </td>
                     <td className="px-3 text-end">
-                      <Link href={`/dashboard/trabajadores/${t.rut}`} className="btn btn-sm btn-outline-primary py-1">
+                      <Button as={Link as any} href={`/dashboard/trabajadores/${t.rut}`} size="sm" variant="outline-primary" className="py-1">
                         <i className="bi bi-eye-fill me-1"></i> Ver Detalle
-                      </Link>
+                      </Button>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
-          </table>
+          </Table>
         </div>
-      </div>
+      </Card>
 
       <Pagination 
         paginaActual={paginaActual}

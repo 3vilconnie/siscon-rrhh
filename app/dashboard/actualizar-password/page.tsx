@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
+import { Card, Form, Button } from 'react-bootstrap';
 
 export default function ActualizarPasswordPage() {
   const [nuevaPassword, setNuevaPassword] = useState('');
@@ -41,7 +42,7 @@ export default function ActualizarPasswordPage() {
   return (
     <div className="container d-flex align-items-center justify-content-center vh-100 bg-light">
       <Toaster position="top-right" />
-      <div className="card shadow-sm border-0 p-4" style={{ maxWidth: '400px', width: '100%' }}>
+      <Card className="shadow-sm border-0 p-4" style={{ maxWidth: '400px', width: '100%' }}>
         <div className="text-center mb-4">
           <div className="bg-warning text-dark rounded-circle d-inline-flex justify-content-center align-items-center mb-3" style={{ width: '60px', height: '60px' }}>
             <i className="bi bi-shield-lock-fill fs-2"></i>
@@ -52,23 +53,22 @@ export default function ActualizarPasswordPage() {
           </p>
         </div>
 
-        <form onSubmit={handleUpdate}>
-          <div className="mb-4">
-            <label className="form-label small fw-bold text-secondary">Nueva Contraseña Segura</label>
-            <input
+        <Form onSubmit={handleUpdate}>
+          <Form.Group className="mb-4">
+            <Form.Label className="small fw-bold text-secondary">Nueva Contraseña Segura</Form.Label>
+            <Form.Control
               type="password"
-              className="form-control"
               placeholder="••••••••"
               value={nuevaPassword}
               onChange={(e) => setNuevaPassword(e.target.value)}
               required
             />
-          </div>
-          <button type="submit" className="btn btn-primary w-100 fw-bold" disabled={loading}>
+          </Form.Group>
+          <Button type="submit" variant="primary" className="w-100 fw-bold" disabled={loading}>
             {loading ? 'Guardando...' : 'Establecer y Continuar'}
-          </button>
-        </form>
-      </div>
+          </Button>
+        </Form>
+      </Card>
     </div>
   );
 }

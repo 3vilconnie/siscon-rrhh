@@ -1,5 +1,7 @@
 'use client';
 
+import { Pagination as BsPagination } from 'react-bootstrap';
+
 interface PaginationProps {
   paginaActual: number;
   totalPaginas: number;
@@ -33,84 +35,60 @@ export default function Pagination({ paginaActual, totalPaginas, onPaginaChange 
   return (
     <div className="d-flex justify-content-center mb-4">
       <nav aria-label="Navegación de páginas">
-        <ul className="pagination pagination-sm shadow-sm m-0 align-items-center">
-          
+        <BsPagination size="sm" className="shadow-sm m-0 align-items-center">
+
           {/* Botón Ir a la Primera Página */}
-          <li className={`page-item ${paginaActual === 1 ? 'disabled' : ''}`}>
-            <button 
-              className="page-link" 
-              onClick={() => onPaginaChange(1)} 
-              title="Primera página"
-              disabled={paginaActual === 1}
-            >
-              <i className="bi bi-chevron-double-left"></i>
-            </button>
-          </li>
+          <BsPagination.First
+            title="Primera página"
+            disabled={paginaActual === 1}
+            onClick={() => onPaginaChange(1)}
+          >
+            <i className="bi bi-chevron-double-left"></i>
+          </BsPagination.First>
 
           {/* Botón Anterior */}
-          <li className={`page-item ${paginaActual === 1 ? 'disabled' : ''}`}>
-            <button
-              className="page-link"
-              onClick={() => onPaginaChange(Math.max(paginaActual - 1, 1))}
-              disabled={paginaActual === 1}
-            >
-              <i className="bi bi-chevron-left"></i>
-            </button>
-          </li>
+          <BsPagination.Prev
+            disabled={paginaActual === 1}
+            onClick={() => onPaginaChange(Math.max(paginaActual - 1, 1))}
+          >
+            <i className="bi bi-chevron-left"></i>
+          </BsPagination.Prev>
 
           {/* Puntos suspensivos iniciales */}
-          {paginasVisibles[0] > 1 && (
-            <li className="page-item disabled">
-              <span className="page-link">...</span>
-            </li>
-          )}
+          {paginasVisibles[0] > 1 && <BsPagination.Ellipsis disabled />}
 
           {/* Números Dinámicos de Páginas */}
           {paginasVisibles.map((numeroPagina) => (
-            <li
+            <BsPagination.Item
               key={numeroPagina}
-              className={`page-item ${paginaActual === numeroPagina ? 'active' : ''}`}
+              active={paginaActual === numeroPagina}
+              onClick={() => onPaginaChange(numeroPagina)}
             >
-              <button
-                className="page-link"
-                onClick={() => onPaginaChange(numeroPagina)}
-              >
-                {numeroPagina}
-              </button>
-            </li>
+              {numeroPagina}
+            </BsPagination.Item>
           ))}
 
           {/* Puntos suspensivos finales */}
-          {paginasVisibles[paginasVisibles.length - 1] < totalPaginas && (
-            <li className="page-item disabled">
-              <span className="page-link">...</span>
-            </li>
-          )}
+          {paginasVisibles[paginasVisibles.length - 1] < totalPaginas && <BsPagination.Ellipsis disabled />}
 
           {/* Botón Siguiente */}
-          <li className={`page-item ${paginaActual === totalPaginas ? 'disabled' : ''}`}>
-            <button
-              className="page-link"
-              onClick={() => onPaginaChange(Math.min(paginaActual + 1, totalPaginas))}
-              disabled={paginaActual === totalPaginas}
-            >
-              <i className="bi bi-chevron-right"></i>
-            </button>
-          </li>
+          <BsPagination.Next
+            disabled={paginaActual === totalPaginas}
+            onClick={() => onPaginaChange(Math.min(paginaActual + 1, totalPaginas))}
+          >
+            <i className="bi bi-chevron-right"></i>
+          </BsPagination.Next>
 
           {/* Botón Ir a la Última Página */}
-          <li className={`page-item ${paginaActual === totalPaginas ? 'disabled' : ''}`}>
-            <button 
-              className="page-link" 
-              onClick={() => onPaginaChange(totalPaginas)} 
-              title="Última página"
-              disabled={paginaActual === totalPaginas}
-            >
-              <i className="bi bi-chevron-double-right"></i>
-            </button>
-          </li>
+          <BsPagination.Last
+            title="Última página"
+            disabled={paginaActual === totalPaginas}
+            onClick={() => onPaginaChange(totalPaginas)}
+          >
+            <i className="bi bi-chevron-double-right"></i>
+          </BsPagination.Last>
 
-        </ul>
+        </BsPagination>
       </nav>
     </div>
   );

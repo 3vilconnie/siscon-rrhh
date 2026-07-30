@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { Card, Table, Badge, Button, Spinner, Row, Col } from 'react-bootstrap';
 import AlertasPanel from '@/components/AlertasPanel';
 import { Trabajador } from '@/types';
 import AiChatSidebar from "@/components/AiChatSidebar";
@@ -38,9 +39,9 @@ export default function TrabajadoresPage() {
           <p className="text-muted small m-0">Visualización general del personal y estado contractual acumulado.</p>
         </div>
         {trabajadores.length > 0 && (
-          <Link href="/dashboard/formulario" className="btn btn-primary fw-bold btn-sm shadow-sm">
+          <Button as={Link as any} href="/dashboard/formulario" variant="primary" size="sm" className="fw-bold shadow-sm">
             <i className="bi bi-person-plus me-2"></i>Nuevo Trabajador
-          </Link>
+          </Button>
         )}
       </div>
 
@@ -48,13 +49,13 @@ export default function TrabajadoresPage() {
 
       {/* MANEJO DE ESTADOS DE CARGA Y CONTENIDO */}
       {loading ? (
-        <div className="card shadow-sm border-0 bg-white p-5 text-center text-muted">
-          <div className="spinner-border text-primary mb-3" role="status"></div>
+        <Card className="shadow-sm border-0 bg-white p-5 text-center text-muted">
+          <Spinner animation="border" className="text-primary mb-3 mx-auto" role="status" />
           <p className="m-0 fw-medium">Sincronizando nómina institucional con Supabase...</p>
-        </div>
+        </Card>
       ) : trabajadores.length === 0 ? (
         // UX OPTIMIZADA: EMPTY STATE INSPIRADOR CON ACCIONES DIRECTAS
-        <div className="card shadow-sm border-0 bg-white p-5 text-center my-3 animate__animated animate__fadeIn">
+        <Card className="shadow-sm border-0 bg-white p-5 text-center my-3 animate__animated animate__fadeIn">
           <div className="card-body mx-auto" style={{ maxWidth: '550px' }}>
             <div className="bg-light text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-4 shadow-sm" style={{ width: '80px', height: '80px' }}>
               <i className="bi bi-database-fill-add display-6"></i>
@@ -64,39 +65,39 @@ export default function TrabajadoresPage() {
               La base de datos de control contractual se encuentra vacía en este momento. Para comenzar a auditar alertas de continuidad y horas compensatorias, selecciona una de las siguientes opciones de alimentación:
             </p>
             
-            <div className="row g-3">
-              <div className="col-sm-6">
+            <Row className="g-3">
+              <Col sm={6}>
                 <div className="p-3 border rounded bg-light h-100 d-flex flex-column justify-content-between">
                   <div>
                     <h6 className="fw-bold text-dark mb-1 small"><i className="bi bi-cloud-arrow-up-fill text-success me-1"></i> Carga Masiva</h6>
                     <p className="text-muted" style={{ fontSize: '0.75rem' }}>Importa los reportes unificados de planillas exportadas desde SIGPER.</p>
                   </div>
-                  <Link href="/dashboard/carga-masiva" className="btn btn-sm btn-success w-100 fw-bold mt-2">
+                  <Button as={Link as any} href="/dashboard/carga-masiva" size="sm" variant="success" className="w-100 fw-bold mt-2">
                     Subir Excel
-                  </Link>
+                  </Button>
                 </div>
-              </div>
-              
-              <div className="col-sm-6">
+              </Col>
+
+              <Col sm={6}>
                 <div className="p-3 border rounded bg-light h-100 d-flex flex-column justify-content-between">
                   <div>
                     <h6 className="fw-bold text-dark mb-1 small"><i className="bi bi-person-plus-fill text-primary me-1"></i> Registro Manual</h6>
                     <p className="text-muted" style={{ fontSize: '0.75rem' }}>Inscribe de forma individual la ficha de identidad y anexo de un nuevo funcionario.</p>
                   </div>
-                  <Link href="/dashboard/formulario" className="btn btn-sm btn-primary w-100 fw-bold mt-2">
+                  <Button as={Link as any} href="/dashboard/formulario" size="sm" variant="primary" className="w-100 fw-bold mt-2">
                     Crear Ficha
-                  </Link>
+                  </Button>
                 </div>
-              </div>
-            </div>
+              </Col>
+            </Row>
           </div>
-        </div>
+        </Card>
       ) : (
         // TABLA ESTÁNDAR CUANDO SÍ HAY DATOS
-        <div className="card shadow-sm border-0 bg-white">
-          <div className="card-body p-0">
+        <Card className="shadow-sm border-0 bg-white">
+          <Card.Body className="p-0">
             <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0">
+              <Table hover className="align-middle mb-0">
                 <thead className="table-dark">
                   <tr>
                     <th className="ps-4 py-3" style={{ backgroundColor: '#212529' }}>RUT</th>
@@ -115,24 +116,24 @@ export default function TrabajadoresPage() {
                           {t.primer_apellido} {t.segundo_apellido || ''} {t.nombres}
                         </td>
                         <td className="text-center">
-                          <span className={`badge ${totalContratos > 1 ? 'bg-info text-dark' : 'bg-light text-dark border'}`}>
+                          <Badge bg={totalContratos > 1 ? 'info' : 'light'} text="dark" className={totalContratos > 1 ? '' : 'border'}>
                             {totalContratos} {totalContratos === 1 ? 'contrato' : 'contratos'}
-                          </span>
+                          </Badge>
                         </td>
                         <td className="text-end pe-4">
                           {/* CORRECCIÓN: Separación del espacio en la clase py-1 fw-bold */}
-                          <Link href={`/dashboard/trabajadores/${t.rut}`} className="btn btn-sm btn-outline-primary py-1 fw-bold">
+                          <Button as={Link as any} href={`/dashboard/trabajadores/${t.rut}`} size="sm" variant="outline-primary" className="py-1 fw-bold">
                             <i className="bi bi-eye-fill me-1"></i> Ver Detalle
-                          </Link>
+                          </Button>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
-              </table>
+              </Table>
             </div>
-          </div>
-        </div>
+          </Card.Body>
+        </Card>
       )}
 
     </div>

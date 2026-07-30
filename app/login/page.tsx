@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
+import { Card, Form, Button, Alert } from 'react-bootstrap';
 
 export default function LoginPage() {
   // Controles del formulario estándar
@@ -63,8 +64,8 @@ export default function LoginPage() {
 
   return (
     <div className="container d-flex align-items-center justify-content-center vh-100 bg-light">
-      <div className="card shadow-sm border-0 p-4" style={{ maxWidth: '400px', width: '100%' }}>
-        
+      <Card className="shadow-sm border-0 p-4" style={{ maxWidth: '400px', width: '100%' }}>
+
         {/* Encabezado Común */}
         <div className="text-center mb-4">
           <h2 className="fw-bold text-primary m-0">
@@ -77,98 +78,97 @@ export default function LoginPage() {
 
         {/* Alertas de Error */}
         {errorMsg && (
-          <div className="alert alert-danger py-2 small text-center" role="alert">
+          <Alert variant="danger" className="py-2 small text-center">
             <i className="bi bi-exclamation-circle-fill me-2"></i>{errorMsg}
-          </div>
+          </Alert>
         )}
 
         {/* Alertas de Éxito (Para cuando se manda el email) */}
         {successMsg && (
-          <div className="alert alert-success py-2 small text-center" role="alert">
+          <Alert variant="success" className="py-2 small text-center">
             <i className="bi bi-check-circle-fill me-2"></i>{successMsg}
-          </div>
+          </Alert>
         )}
 
         {/* --- FORMULARIO VISTA: LOGIN --- */}
         {vista === 'login' ? (
-          <form onSubmit={handleLogin}>
-            <div className="mb-3">
-              <label className="form-label small fw-semibold text-secondary">Correo Electrónico</label>
-              <input
+          <Form onSubmit={handleLogin}>
+            <Form.Group className="mb-3">
+              <Form.Label className="small fw-semibold text-secondary">Correo Electrónico</Form.Label>
+              <Form.Control
                 type="email"
-                className="form-control"
                 placeholder="nombre@empresa.cl"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
-            </div>
+            </Form.Group>
 
-            <div className="mb-2">
-              <label className="form-label small fw-semibold text-secondary">Contraseña</label>
-              <input
+            <Form.Group className="mb-2">
+              <Form.Label className="small fw-semibold text-secondary">Contraseña</Form.Label>
+              <Form.Control
                 type="password"
-                className="form-control"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
-            </div>
+            </Form.Group>
 
             {/* Enlace para ir a la sección de olvidar contraseña */}
             <div className="text-end mb-4">
-              <button 
-                type="button" 
-                className="btn btn-link p-0 small text-decoration-none"
+              <Button
+                type="button"
+                variant="link"
+                className="p-0 small text-decoration-none"
                 style={{ fontSize: '0.82rem' }}
                 onClick={() => cambiarVista('recuperar')}
               >
                 ¿Olvidaste tu contraseña?
-              </button>
+              </Button>
             </div>
 
-            <button type="submit" className="btn btn-primary w-100 fw-semibold" disabled={loading}>
+            <Button type="submit" variant="primary" className="w-100 fw-semibold" disabled={loading}>
               {loading ? 'Autenticando...' : 'Iniciar Sesión'}
-            </button>
-          </form>
+            </Button>
+          </Form>
         ) : (
           /* --- FORMULARIO VISTA: RECUPERAR CONTRASEÑA --- */
-          <form onSubmit={handleRecuperarPassword}>
-            <div className="mb-4">
-              <label className="form-label small fw-semibold text-secondary">Ingresa tu Correo Institucional</label>
-              <input
+          <Form onSubmit={handleRecuperarPassword}>
+            <Form.Group className="mb-4">
+              <Form.Label className="small fw-semibold text-secondary">Ingresa tu Correo Institucional</Form.Label>
+              <Form.Control
                 type="email"
-                className="form-control"
                 placeholder="nombre@empresa.cl"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
-              <div className="form-text text-muted" style={{ fontSize: '0.75rem' }}>
+              <Form.Text className="text-muted" style={{ fontSize: '0.75rem' }}>
                 Te enviaremos un correo electrónico seguro con un enlace temporal para actualizar tus credenciales.
-              </div>
-            </div>
+              </Form.Text>
+            </Form.Group>
 
-            <button type="submit" className="btn btn-primary w-100 fw-semibold mb-3" disabled={loading}>
+            <Button type="submit" variant="primary" className="w-100 fw-semibold mb-3" disabled={loading}>
               {loading ? 'Enviando...' : 'Enviar Enlace de Recuperación'}
-            </button>
+            </Button>
 
             {/* Botón para regresar al login */}
             <div className="text-center">
-              <button 
-                type="button" 
-                className="btn btn-link small text-decoration-none text-secondary"
+              <Button
+                type="button"
+                variant="link"
+                className="small text-decoration-none text-secondary"
                 style={{ fontSize: '0.82rem' }}
                 onClick={() => cambiarVista('login')}
               >
                 <i className="bi bi-arrow-left me-1"></i> Volver al Inicio de Sesión
-              </button>
+              </Button>
             </div>
-          </form>
+          </Form>
         )}
 
-      </div>
+      </Card>
     </div>
   );
 }

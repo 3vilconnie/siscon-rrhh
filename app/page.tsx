@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { Spinner } from 'react-bootstrap';
 
 export default function RootPage() {
   const router = useRouter();
@@ -21,9 +22,9 @@ export default function RootPage() {
 
   return (
     <div className="vh-100 d-flex align-items-center justify-content-center bg-light">
-      <div className="spinner-border text-primary" role="status">
+      <Spinner animation="border" className="text-primary" role="status">
         <span className="visually-hidden">Cargando siscon RRHH...</span>
-      </div>
+      </Spinner>
     </div>
   );
 }

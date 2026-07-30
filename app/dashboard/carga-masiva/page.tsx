@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
+import { Card, Form, Button, ProgressBar, ListGroup, Badge } from 'react-bootstrap';
 
 interface LogProceso {
   archivo: string;
@@ -207,17 +208,18 @@ export default function CargaMasivaMultiPage() {
         </p>
       </div>
 
-      <div className="card shadow-sm border-0 p-4 bg-white text-center mb-4">
+      <Card className="shadow-sm border-0 p-4 bg-white text-center mb-4">
         <div className="border border-2 border-dashed rounded p-5 bg-light position-relative">
           <i className="bi bi-file-earmark-excel text-success display-4 mb-3 d-block"></i>
-          <label className="form-label fw-bold text-dark d-block mb-1 cursor-pointer">
+          <Form.Label className="fw-bold text-dark d-block mb-1 cursor-pointer">
             Seleccionar o arrastrar múltiples planillas
-          </label>
+          </Form.Label>
           <span className="text-muted small d-block mb-3">Soporta múltiples archivos .xlsx al mismo tiempo</span>
-          
-          <input
+
+          <Form.Control
             type="file"
-            className="form-control form-control-sm mx-auto"
+            size="sm"
+            className="mx-auto"
             style={{ maxWidth: '350px' }}
             multiple
             accept=".xlsx, .xls"
@@ -232,54 +234,49 @@ export default function CargaMasivaMultiPage() {
               <i className="bi bi-files me-2 text-primary"></i>
               Se han seleccionado <strong>{archivos.length} planillas</strong> listas para procesar.
             </div>
-            <button
-              className="btn btn-primary fw-bold"
+            <Button
+              variant="primary"
+              className="fw-bold"
               onClick={handleIniciarCargaMasiva}
               disabled={procesando}
             >
               <i className="bi bi-play-circle-fill me-1"></i> Procesar Bloque Masivo
-            </button>
+            </Button>
           </div>
         )}
-      </div>
+      </Card>
 
       {procesando && (
-        <div className="card shadow-sm border-0 p-3 mb-4 bg-white">
+        <Card className="shadow-sm border-0 p-3 mb-4 bg-white">
           <div className="d-flex justify-content-between mb-1 small fw-bold">
             <span>Progreso General de Inserción</span>
             <span className="text-primary">{progreso}% Completo</span>
           </div>
-          <div className="progress" style={{ height: '12px' }}>
-            <div
-              className="progress-bar progress-bar-striped progress-bar-animated bg-success"
-              role="progressbar"
-              style={{ width: `${progreso}%` }}
-            ></div>
-          </div>
-        </div>
+          <ProgressBar striped animated variant="success" now={progreso} style={{ height: '12px' }} />
+        </Card>
       )}
 
       {logs.length > 0 && (
-        <div className="card shadow-sm border-0">
-          <div className="card-header bg-dark text-white fw-bold small">
+        <Card className="shadow-sm border-0">
+          <Card.Header className="bg-dark text-white fw-bold small">
             <i className="bi bi-terminal me-2"></i>Consola de Auditoría de Carga ({logs.length} procesados)
-          </div>
-          <div className="card-body p-0 overflow-auto bg-light" style={{ maxHeight: '400px' }}>
-            <div className="list-group list-group-flush font-monospace small">
+          </Card.Header>
+          <Card.Body className="p-0 overflow-auto bg-light" style={{ maxHeight: '400px' }}>
+            <ListGroup variant="flush" className="font-monospace small">
               {logs.map((log, idx) => (
-                <div key={idx} className={`list-group-item d-flex justify-content-between align-items-center py-2 ${log.estado === 'error' ? 'list-group-item-danger' : 'list-group-item-success'}`}>
+                <ListGroup.Item key={idx} variant={log.estado === 'error' ? 'danger' : 'success'} className="d-flex justify-content-between align-items-center py-2">
                   <div>
                     <i className={`bi ${log.estado === 'error' ? 'bi-x-circle-fill text-danger' : 'bi-check-circle-fill text-success'} me-2`}></i>
                     <strong>{log.archivo}</strong>: <span className="text-secondary">{log.detalle}</span>
                   </div>
-                  <span className={`badge ${log.estado === 'error' ? 'bg-danger' : 'bg-success'}`}>
+                  <Badge bg={log.estado === 'error' ? 'danger' : 'success'}>
                     {log.estado.toUpperCase()}
-                  </span>
-                </div>
+                  </Badge>
+                </ListGroup.Item>
               ))}
-            </div>
-          </div>
-        </div>
+            </ListGroup>
+          </Card.Body>
+        </Card>
       )}
 
     </div>

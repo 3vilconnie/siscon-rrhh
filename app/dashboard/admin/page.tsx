@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { evaluarAlertaContinuidad } from '@/lib/utils/calculoAlertas';
+import { Card, Row, Col, Form, Table, Badge, Button, Modal, Alert, ListGroup } from 'react-bootstrap';
 import { Trabajador } from '@/types';
 
 interface Usuario {
@@ -196,52 +197,52 @@ export default function ConsolaAdministradorCompleta() {
           <h2 className="fw-bold text-dark m-0">⚙️ Consola de Administración</h2>
           <p className="text-muted small m-0">Administración de credenciales, parámetros, auditoría y reportes.</p>
         </div>
-        <button className="btn btn-outline-dark fw-bold small" onClick={cargarDatosConsola} disabled={loading}>
+        <Button variant="outline-dark" className="fw-bold small" onClick={cargarDatosConsola} disabled={loading}>
           <i className="bi bi-arrow-clockwise me-1"></i> Sincronizar
-        </button>
+        </Button>
       </div>
 
-      <div className="row g-4">
-        <div className="col-12 col-lg-4 d-flex flex-column gap-4">
-          <div className="card shadow-sm border-0 bg-white p-4">
+      <Row className="g-4">
+        <Col xs={12} lg={4} className="d-flex flex-column gap-4">
+          <Card className="shadow-sm border-0 bg-white p-4">
             <h5 className="fw-bold text-secondary border-bottom pb-2 mb-3">Parámetros de Alerta</h5>
-            <form onSubmit={handleGuardarParametros} className="d-flex flex-column gap-3">
+            <Form onSubmit={handleGuardarParametros} className="d-flex flex-column gap-3">
               <div>
-                <label className="form-label small fw-bold">Ventana de Evaluación (Meses)</label>
-                <input type="number" className="form-control" value={parametros.ventana_meses} onChange={(e) => setParametros({ ...parametros, ventana_meses: Number(e.target.value) })} min={1} required />
+                <Form.Label className="small fw-bold">Ventana de Evaluación (Meses)</Form.Label>
+                <Form.Control type="number" value={parametros.ventana_meses} onChange={(e) => setParametros({ ...parametros, ventana_meses: Number(e.target.value) })} min={1} required />
               </div>
               <div>
-                <label className="form-label small fw-bold">Enfriamiento (Meses)</label>
-                <input type="number" className="form-control" value={parametros.enfriamiento_meses} onChange={(e) => setParametros({ ...parametros, enfriamiento_meses: Number(e.target.value) })} min={1} required />
+                <Form.Label className="small fw-bold">Enfriamiento (Meses)</Form.Label>
+                <Form.Control type="number" value={parametros.enfriamiento_meses} onChange={(e) => setParametros({ ...parametros, enfriamiento_meses: Number(e.target.value) })} min={1} required />
               </div>
-              <button type="submit" className="btn btn-warning fw-bold mt-2" disabled={guardandoParametros}>
+              <Button type="submit" variant="warning" className="fw-bold mt-2" disabled={guardandoParametros}>
                 {guardandoParametros ? 'Guardando...' : 'Actualizar Reglas'}
-              </button>
-            </form>
-          </div>
+              </Button>
+            </Form>
+          </Card>
 
-          <div className="card shadow-sm border-0 bg-white p-4">
+          <Card className="shadow-sm border-0 bg-white p-4">
             <h5 className="fw-bold text-secondary border-bottom pb-2 mb-3">
               <i className="bi bi-file-earmark-excel me-2 text-success"></i>Exportación de Datos
             </h5>
             <p className="text-muted small mb-3">Descarga la información en formato CSV compatible con Microsoft Excel.</p>
             <div className="d-flex flex-column gap-2">
-              <button className="btn btn-outline-success text-start fw-semibold" onClick={handleExportarNomina} disabled={exportando}>
+              <Button variant="outline-success" className="text-start fw-semibold" onClick={handleExportarNomina} disabled={exportando}>
                 <i className="bi bi-people me-2"></i>Descargar Nómina Completa
-              </button>
-              <button className="btn btn-outline-danger text-start fw-semibold" onClick={handleExportarAlertas} disabled={exportando}>
+              </Button>
+              <Button variant="outline-danger" className="text-start fw-semibold" onClick={handleExportarAlertas} disabled={exportando}>
                 <i className="bi bi-exclamation-triangle me-2"></i>Reporte Legal de Alertas
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+          </Card>
+        </Col>
 
-        <div className="col-12 col-lg-8 d-flex flex-column gap-4">
-          <div className="card shadow-sm border-0 bg-white p-4">
+        <Col xs={12} lg={8} className="d-flex flex-column gap-4">
+          <Card className="shadow-sm border-0 bg-white p-4">
             <h5 className="fw-bold text-secondary border-bottom pb-2 mb-3">
               <i className="bi bi-person-plus-fill me-2 text-primary"></i>Crear Nuevo Operador
             </h5>
-            <form 
+            <Form
               onSubmit={async (e) => {
                 e.preventDefault();
                 const form = e.target as HTMLFormElement;
@@ -268,27 +269,27 @@ export default function ConsolaAdministradorCompleta() {
               }}
               className="row g-3"
             >
-              <div className="col-md-5">
-                <input type="email" name="email" className="form-control" placeholder="correo@institucion.cl" required />
-              </div>
-              <div className="col-md-4">
-                <select name="role" className="form-select" required>
+              <Col md={5}>
+                <Form.Control type="email" name="email" placeholder="correo@institucion.cl" required />
+              </Col>
+              <Col md={4}>
+                <Form.Select name="role" required>
                   <option value="usuario">Operador Estándar</option>
                   <option value="admin">Administrador Global</option>
-                </select>
-              </div>
-              <div className="col-md-3">
-                <button type="submit" className="btn btn-primary w-100 fw-bold">Crear Cuenta</button>
-              </div>
-            </form>
-          </div>
+                </Form.Select>
+              </Col>
+              <Col md={3}>
+                <Button type="submit" variant="primary" className="w-100 fw-bold">Crear Cuenta</Button>
+              </Col>
+            </Form>
+          </Card>
 
-          <div className="card shadow-sm border-0 bg-white overflow-hidden">
-            <div className="card-header bg-dark text-white fw-bold small py-3">
+          <Card className="shadow-sm border-0 bg-white overflow-hidden">
+            <Card.Header className="bg-dark text-white fw-bold small py-3">
               <i className="bi bi-shield-lock me-2"></i>Operadores Institucionales
-            </div>
+            </Card.Header>
             <div className="table-responsive">
-              <table className="table table-hover align-middle m-0 small">
+              <Table hover className="align-middle m-0 small">
                 <thead className="table-light text-uppercase">
                   <tr>
                     <th className="px-3">Email</th>
@@ -306,44 +307,48 @@ export default function ConsolaAdministradorCompleta() {
                       return (
                         <tr key={u.id} className={suspendido ? 'table-danger bg-opacity-25' : ''}>
                           <td className="px-3 fw-semibold">{u.email}</td>
-                          <td><span className={`badge ${u.user_metadata?.role === 'admin' ? 'bg-danger' : 'bg-secondary'}`}>{u.user_metadata?.role || 'USER'}</span></td>
-                          <td>{suspendido ? <span className="badge bg-danger">Suspendido</span> : <span className="badge bg-success">Activo</span>}</td>
+                          <td><Badge bg={u.user_metadata?.role === 'admin' ? 'danger' : 'secondary'}>{u.user_metadata?.role || 'USER'}</Badge></td>
+                          <td>{suspendido ? <Badge bg="danger">Suspendido</Badge> : <Badge bg="success">Activo</Badge>}</td>
                           <td className="text-end px-3">
-                            <button 
-                              onClick={() => abrirModalConfirmacion(u, suspendido ? 'activar' : 'suspender')} 
-                              className={`btn btn-sm py-1 px-2 me-2 fw-bold ${suspendido ? 'btn-success' : 'btn-outline-warning'}`}
+                            <Button
+                              size="sm"
+                              variant={suspendido ? 'success' : 'outline-warning'}
+                              onClick={() => abrirModalConfirmacion(u, suspendido ? 'activar' : 'suspender')}
+                              className="py-1 px-2 me-2 fw-bold"
                               title={suspendido ? "Reactivar acceso" : "Suspender temporalmente"}
                             >
                               <i className={`bi ${suspendido ? 'bi-play-fill' : 'bi-pause-fill'}`}></i>
-                            </button>
-                            <button 
-                              onClick={() => abrirModalConfirmacion(u, 'eliminar')} 
-                              className="btn btn-sm btn-outline-danger py-1 px-2"
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline-danger"
+                              onClick={() => abrirModalConfirmacion(u, 'eliminar')}
+                              className="py-1 px-2"
                               title="Eliminar definitivamente"
                             >
                               <i className="bi bi-trash-fill"></i>
-                            </button>
+                            </Button>
                           </td>
                         </tr>
                       );
                     })
                   )}
                 </tbody>
-              </table>
+              </Table>
             </div>
-          </div>
+          </Card>
 
-          <div className="card shadow-sm border-0 bg-white">
-            <div className="card-header bg-secondary text-white fw-bold small">
+          <Card className="shadow-sm border-0 bg-white">
+            <Card.Header className="bg-secondary text-white fw-bold small">
               <i className="bi bi-journal-text me-2"></i>Historial de Auditoría
-            </div>
-            <div className="card-body p-0 overflow-auto" style={{ maxHeight: '350px' }}>
-              <div className="list-group list-group-flush small font-monospace">
+            </Card.Header>
+            <Card.Body className="p-0 overflow-auto" style={{ maxHeight: '350px' }}>
+              <ListGroup variant="flush" className="small font-monospace">
                 {logs.length === 0 ? (
                   <div className="p-3 text-muted text-center">No hay registros aún.</div>
                 ) : (
                   logs.map(log => (
-                    <div key={log.id} className="list-group-item p-2 border-bottom">
+                    <ListGroup.Item key={log.id} className="p-2 border-bottom">
                       <div className="d-flex justify-content-between mb-1">
                         <strong className="text-primary">{log.accion}</strong>
                         <span className="text-muted" style={{ fontSize: '10px' }}>
@@ -351,101 +356,92 @@ export default function ConsolaAdministradorCompleta() {
                         </span>
                       </div>
                       <div className="text-muted" style={{ fontSize: '11px' }}>{log.detalles}</div>
-                    </div>
+                    </ListGroup.Item>
                   ))
                 )}
-              </div>
-            </div>
+              </ListGroup>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* --- MODAL DE SEGURIDAD (react-bootstrap) --- */}
+      <Modal
+        show={modalConfirmar.visible}
+        onHide={() => !procesandoAccion && setModalConfirmar(prev => ({ ...prev, visible: false }))}
+        centered
+        contentClassName="border-0 shadow-lg"
+      >
+        <Modal.Header
+          closeButton
+          closeVariant="white"
+          className={`border-0 text-white ${modalConfirmar.tipo === 'eliminar' ? 'bg-danger' : 'bg-dark'}`}
+        >
+          <Modal.Title className="fw-bold h5">
+            <i className={`bi me-2 ${modalConfirmar.tipo === 'eliminar' ? 'bi-exclamation-octagon-fill' : 'bi-shield-exclamation'}`}></i>
+            {modalConfirmar.tipo === 'eliminar' && 'Confirmación de Eliminación Crítica'}
+            {modalConfirmar.tipo === 'suspender' && 'Confirmación de Suspensión de Operador'}
+            {modalConfirmar.tipo === 'activar' && 'Confirmación de Reactivación de Cuenta'}
+          </Modal.Title>
+        </Modal.Header>
+
+        <Modal.Body className="p-4">
+          <p className="text-secondary small mb-3">Estás a punto de modificar el estado de la siguiente credencial del sistema:</p>
+          <div className="bg-light p-3 rounded mb-3 font-monospace small border">
+            <strong>Email:</strong> {modalConfirmar.usuarioEmail} <br />
+            <strong>ID Técnico:</strong> {modalConfirmar.usuarioId}
           </div>
-        </div>
-      </div>
 
-      {/* --- NUEVO: MODAL DE SEGURIDAD ESTILIZADO DE BOOTSTRAP 5 --- */}
-      {modalConfirmar.visible && (
-        <div className="modal show d-block animate__animated animate__fadeIn" tabIndex={-1} style={{ backgroundColor: 'rgba(33,37,41,0.6)', zIndex: 1060 }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 shadow-lg">
-              
-              <div className={`modal-header border-0 text-white ${
-                modalConfirmar.tipo === 'eliminar' ? 'bg-danger' : 'bg-dark'
-              }`}>
-                <h5 className="modal-title fw-bold">
-                  <i className={`bi me-2 ${
-                    modalConfirmar.tipo === 'eliminar' ? 'bi-exclamation-octagon-fill' : 'bi-shield-exclamation'
-                  }`}></i>
-                  {modalConfirmar.tipo === 'eliminar' && 'Confirmación de Eliminación Crítica'}
-                  {modalConfirmar.tipo === 'suspender' && 'Confirmación de Suspensión de Operador'}
-                  {modalConfirmar.tipo === 'activar' && 'Confirmación de Reactivación de Cuenta'}
-                </h5>
-                <button 
-                  type="button" 
-                  className="btn-close btn-close-white" 
-                  onClick={() => setModalConfirmar(prev => ({ ...prev, visible: false }))}
-                  disabled={procesandoAccion}
-                ></button>
-              </div>
+          {/* FLUJO CONDICIONAL SEGÚN LA ACCIÓN */}
+          {modalConfirmar.tipo === 'eliminar' ? (
+            <Alert variant="danger" className="p-2 px-3 small border-0 m-0">
+              <i className="bi bi-info-circle-fill me-2"></i>
+              Esta acción es irreversible y removerá al operador permanentemente.
+            </Alert>
+          ) : modalConfirmar.tipo === 'suspender' ? (
+            <p className="small text-muted m-0">El usuario no podrá iniciar sesión ni realizar consultas en la base de datos hasta que un administrador levante el bloqueo.</p>
+          ) : (
+            <p className="small text-muted m-0">Se restaurará el acceso de forma inmediata a los paneles del dashboard contractual.</p>
+          )}
 
-              <div className="modal-body p-4">
-                <p className="text-secondary small mb-3">Estás a punto de modificar el estado de la siguiente credencial del sistema:</p>
-                <div className="bg-light p-3 rounded mb-3 font-monospace small border">
-                  <strong>Email:</strong> {modalConfirmar.usuarioEmail} <br />
-                  <strong>ID Técnico:</strong> {modalConfirmar.usuarioId}
-                </div>
-
-                {/* FLUJO CONDICIONAL SEGÚN LA ACCIÓN */}
-                {modalConfirmar.tipo === 'eliminar' ? (
-                  <div className="alert alert-danger p-2 px-3 small border-0 m-0">
-                    <i className="bi bi-info-circle-fill me-2"></i>
-                    Esta acción es irreversible y removerá al operador permanentemente.
-                  </div>
-                ) : modalConfirmar.tipo === 'suspender' ? (
-                  <p className="small text-muted m-0">El usuario no podrá iniciar sesión ni realizar consultas en la base de datos hasta que un administrador levante el bloqueo.</p>
-                ) : (
-                  <p className="small text-muted m-0">Se restaurará el acceso de forma inmediata a los paneles del dashboard contractual.</p>
-                )}
-
-                {/* UX CRÍTICA: Checkbox de consentimiento antes de permitir el clic destructivo */}
-                {modalConfirmar.tipo === 'eliminar' && (
-                  <div className="form-check mt-3 border-top pt-3">
-                    <input 
-                      className="form-check-input cursor-pointer" 
-                      type="checkbox" 
-                      id="checkConsentimiento" 
-                      checked={checkConsentimiento}
-                      onChange={(e) => setCheckConsentimiento(e.target.checked)}
-                    />
-                    <label className="form-check-label small fw-bold text-danger cursor-pointer" htmlFor="checkConsentimiento">
-                      Comprendo las consecuencias y deseo eliminar definitivamente esta cuenta.
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              <div className="modal-footer border-0 bg-light py-2">
-                <button 
-                  type="button" 
-                  className="btn btn-sm btn-outline-secondary px-3" 
-                  onClick={() => setModalConfirmar(prev => ({ ...prev, visible: false }))}
-                  disabled={procesandoAccion}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="button" 
-                  className={`btn btn-sm fw-bold px-4 ${
-                    modalConfirmar.tipo === 'eliminar' ? 'btn-danger' : 'btn-dark'
-                  }`}
-                  onClick={ejecutarAccionUsuario}
-                  disabled={procesandoAccion || (modalConfirmar.tipo === 'eliminar' && !checkConsentimiento)}
-                >
-                  {procesandoAccion ? 'Procesando...' : 'Confirmar Acción'}
-                </button>
-              </div>
-
+          {/* UX CRÍTICA: Checkbox de consentimiento antes de permitir el clic destructivo */}
+          {modalConfirmar.tipo === 'eliminar' && (
+            <div className="mt-3 border-top pt-3">
+              <Form.Check
+                type="checkbox"
+                id="checkConsentimiento"
+                className="cursor-pointer"
+                checked={checkConsentimiento}
+                onChange={(e) => setCheckConsentimiento(e.target.checked)}
+                label={<span className="small fw-bold text-danger">Comprendo las consecuencias y deseo eliminar definitivamente esta cuenta.</span>}
+              />
             </div>
-          </div>
-        </div>
-      )}
+          )}
+        </Modal.Body>
+
+        <Modal.Footer className="border-0 bg-light py-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline-secondary"
+            className="px-3"
+            onClick={() => setModalConfirmar(prev => ({ ...prev, visible: false }))}
+            disabled={procesandoAccion}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={modalConfirmar.tipo === 'eliminar' ? 'danger' : 'dark'}
+            className="fw-bold px-4"
+            onClick={ejecutarAccionUsuario}
+            disabled={procesandoAccion || (modalConfirmar.tipo === 'eliminar' && !checkConsentimiento)}
+          >
+            {procesandoAccion ? 'Procesando...' : 'Confirmar Acción'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
     </div>
   );
