@@ -10,7 +10,6 @@ import {
   Badge,
   Alert,
   Spinner,
-  Button,
   CloseButton,
   ListGroup,
 } from 'react-bootstrap';
@@ -177,13 +176,9 @@ export default function AlertasPanel() {
                       Sugerencia Retorno:{' '}
                       <strong className="text-dark">{a.fechaSugerida || 'Inmediato'}</strong>
                     </span>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="text-danger p-0 fw-bold text-decoration-none small"
-                    >
-                      Ver Historial Cronológico →
-                    </Button>
+                    {/* span (no <button>) para no anidar botones dentro del
+                        ListGroup.Item action, que ya se renderiza como <button> */}
+                    <span className="text-danger fw-bold small">Ver Historial Cronológico →</span>
                   </div>
                 </ListGroup.Item>
               ))
