@@ -1,0 +1,36 @@
+{
+  // Formatea con Prettier al guardar
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+  // Corrige lo que ESLint pueda arreglar solo al guardar
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "cSpell.words": [
+    "ANUAL",
+    "Buscador",
+    "Búsqueda",
+    "Compensatorias",
+    "Consumo",
+    "creado",
+    "Datos",
+    "Detalle",
+    "Estados",
+    "fecha",
+    "Formulario",
+    "Funcionario",
+    "Ingreso",
+    "pagina",
+    "Pagina",
+    "Paginación",
+    "registros",
+    "Resumen",
+    "resumenes",
+    "Seleccionado",
+    "solicitadas",
+    "supabase",
+    "Trabajador",
+    "Trabajadores"
+  ]
+}

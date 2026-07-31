@@ -11,7 +11,7 @@ export default function FormularioTrabajador() {
   const [nombres, setNombres] = useState('');
   const [primerApellido, setPrimerApellido] = useState('');
   const [segundoApellido, setSegundoApellido] = useState('');
-  
+
   // 2. Estados de Estructura Contractual
   const [jornada, setJornada] = useState('44');
   const [sueldoBase, setSueldoBase] = useState('');
@@ -22,7 +22,7 @@ export default function FormularioTrabajador() {
   const [buscandoRut, setBuscandoRut] = useState(false);
   const [existeTrabajador, setExisteTrabajador] = useState(false);
   const [bloqueado, setBloqueado] = useState(false);
-  const [mostrarContrato, setMostrarContrato] = useState(false); 
+  const [mostrarContrato, setMostrarContrato] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const calcularDV = (rutAncho: string) => {
@@ -44,7 +44,7 @@ export default function FormularioTrabajador() {
   // UX: Monitor dinámico del RUT con debounce
   useEffect(() => {
     const cuerpoRut = rut.replace(/[^0-9]/g, '');
-    
+
     if (cuerpoRut.length >= 7) {
       const dvCalculado = calcularDV(cuerpoRut);
       setDv(dvCalculado);
@@ -129,16 +129,21 @@ export default function FormularioTrabajador() {
         const inicioNuevo = new Date(fechaInicio);
         const terminoNuevo = fechaTermino ? new Date(fechaTermino) : new Date('2099-12-31');
 
-        const hayTraslape = contratosExistentes.some(contrato => {
+        const hayTraslape = contratosExistentes.some((contrato) => {
           const inicioExistente = new Date(contrato.fecha_inicio);
-          const terminoExistente = contrato.fecha_termino ? new Date(contrato.fecha_termino) : new Date('2099-12-31');
-          return (inicioNuevo <= terminoExistente && terminoNuevo >= inicioExistente);
+          const terminoExistente = contrato.fecha_termino
+            ? new Date(contrato.fecha_termino)
+            : new Date('2099-12-31');
+          return inicioNuevo <= terminoExistente && terminoNuevo >= inicioExistente;
         });
 
         if (hayTraslape) {
-          toast.error('El período ingresado se superpone con las fechas de otro contrato ya registrado.', { id: toastId, duration: 5000 });
+          toast.error(
+            'El período ingresado se superpone con las fechas de otro contrato ya registrado.',
+            { id: toastId, duration: 5000 },
+          );
           setLoading(false);
-          return; 
+          return;
         }
       }
 
@@ -149,7 +154,7 @@ export default function FormularioTrabajador() {
           dv: dv.toUpperCase(),
           nombres: nombres.toUpperCase().trim(),
           primer_apellido: primerApellido.toUpperCase().trim(),
-          segundo_apellido: segundoApellido ? segundoApellido.toUpperCase().trim() : null
+          segundo_apellido: segundoApellido ? segundoApellido.toUpperCase().trim() : null,
         });
         if (errTrabajador) throw errTrabajador;
       }
@@ -160,14 +165,13 @@ export default function FormularioTrabajador() {
         jornada: parseInt(jornada),
         sueldo_base: parseFloat(sueldoBase),
         fecha_inicio: fechaInicio,
-        fecha_termino: fechaTermino || null
+        fecha_termino: fechaTermino || null,
       });
 
       if (errContrato) throw errContrato;
 
       toast.success('¡Ficha contractual guardada exitosamente!', { id: toastId });
       handleLimpiarFormulario();
-      
     } catch (error: any) {
       toast.error(`Error al procesar: ${error.message}`, { id: toastId });
     } finally {
@@ -182,10 +186,14 @@ export default function FormularioTrabajador() {
       </Card.Header>
 
       <Card.Body className="p-4 p-md-5">
-
         {/* SECCIÓN 1: IDENTIDAD */}
         <h6 className="text-secondary border-bottom pb-2 mb-4 fw-bold text-uppercase d-flex align-items-center">
-          <span className="bg-primary text-white rounded-circle d-inline-flex justify-content-center align-items-center me-2" style={{ width: '24px', height: '24px', fontSize: '12px' }}>1</span>
+          <span
+            className="bg-primary text-white rounded-circle d-inline-flex justify-content-center align-items-center me-2"
+            style={{ width: '24px', height: '24px', fontSize: '12px' }}
+          >
+            1
+          </span>
           Datos de Identidad
         </h6>
 
@@ -205,14 +213,26 @@ export default function FormularioTrabajador() {
           <Col xs={4} md={2}>
             <Form.Label className="small fw-bold text-secondary">DV</Form.Label>
             <InputGroup>
-              <InputGroup.Text className="bg-light fw-bold w-100 justify-content-center" style={{ height: '38px' }}>
-                {buscandoRut ? <Spinner animation="border" size="sm" className="text-primary" role="status" /> : (dv || '-')}
+              <InputGroup.Text
+                className="bg-light fw-bold w-100 justify-content-center"
+                style={{ height: '38px' }}
+              >
+                {buscandoRut ? (
+                  <Spinner animation="border" size="sm" className="text-primary" role="status" />
+                ) : (
+                  dv || '-'
+                )}
               </InputGroup.Text>
             </InputGroup>
           </Col>
           <Col md={6} className="d-flex align-items-end">
             {bloqueado && (
-              <Button type="button" variant="outline-danger" className="fw-semibold px-3 w-100 w-md-auto" onClick={handleLimpiarFormulario}>
+              <Button
+                type="button"
+                variant="outline-danger"
+                className="fw-semibold px-3 w-100 w-md-auto"
+                onClick={handleLimpiarFormulario}
+              >
                 <i className="bi bi-arrow-counterclockwise me-1"></i> Cambiar RUT o Funcionario
               </Button>
             )}
@@ -220,10 +240,15 @@ export default function FormularioTrabajador() {
 
           {bloqueado && (
             <Col xs={12} className="my-2 animate__animated animate__fadeIn">
-              <Alert variant="info" className="border-0 shadow-sm d-flex align-items-center m-0 py-2 px-3 small">
+              <Alert
+                variant="info"
+                className="border-0 shadow-sm d-flex align-items-center m-0 py-2 px-3 small"
+              >
                 <i className="bi bi-shield-lock-fill text-info fs-5 me-2"></i>
                 <div>
-                  <strong>Funcionario Vinculado:</strong> Los datos de identidad están resguardados en el archivo maestro. Presiona <u>Continuar con Contrato</u> para abrir la sección contractual.
+                  <strong>Funcionario Vinculado:</strong> Los datos de identidad están resguardados
+                  en el archivo maestro. Presiona <u>Continuar con Contrato</u> para abrir la
+                  sección contractual.
                 </div>
               </Alert>
             </Col>
@@ -292,7 +317,14 @@ export default function FormularioTrabajador() {
         {/* CONTROL DE FLUJO DINÁMICO (UX) */}
         {!mostrarContrato && (
           <div className="d-flex justify-content-end gap-2 pt-3 border-top">
-            <Button type="button" variant="outline-secondary" className="px-4 small" onClick={handleLimpiarFormulario}>Limpiar Todo</Button>
+            <Button
+              type="button"
+              variant="outline-secondary"
+              className="px-4 small"
+              onClick={handleLimpiarFormulario}
+            >
+              Limpiar Todo
+            </Button>
             <Button
               type="button"
               variant="primary"
@@ -310,9 +342,17 @@ export default function FormularioTrabajador() {
 
         {/* SECCIÓN 2: ESTRUCTURA CONTRACTUAL */}
         {mostrarContrato && (
-          <Form onSubmit={handleGuardarFormulario} className="animate__animated animate__fadeIn mt-5">
+          <Form
+            onSubmit={handleGuardarFormulario}
+            className="animate__animated animate__fadeIn mt-5"
+          >
             <h6 className="text-secondary border-bottom pb-2 mb-4 fw-bold text-uppercase d-flex align-items-center">
-              <span className="bg-primary text-white rounded-circle d-inline-flex justify-content-center align-items-center me-2" style={{ width: '24px', height: '24px', fontSize: '12px' }}>2</span>
+              <span
+                className="bg-primary text-white rounded-circle d-inline-flex justify-content-center align-items-center me-2"
+                style={{ width: '24px', height: '24px', fontSize: '12px' }}
+              >
+                2
+              </span>
               Estructura Contractual
             </h6>
 
@@ -320,7 +360,12 @@ export default function FormularioTrabajador() {
               <Col md={3}>
                 <Form.Label className="small fw-semibold">Jornada Semanal</Form.Label>
                 <InputGroup>
-                  <Form.Control type="number" value={jornada} onChange={(e) => setJornada(e.target.value)} required />
+                  <Form.Control
+                    type="number"
+                    value={jornada}
+                    onChange={(e) => setJornada(e.target.value)}
+                    required
+                  />
                   <InputGroup.Text className="bg-light text-muted">Hrs.</InputGroup.Text>
                 </InputGroup>
               </Col>
@@ -329,7 +374,13 @@ export default function FormularioTrabajador() {
                 <Form.Label className="small fw-semibold">Sueldo Base Bruto</Form.Label>
                 <InputGroup>
                   <InputGroup.Text className="bg-light text-muted">$</InputGroup.Text>
-                  <Form.Control type="number" placeholder="650000" value={sueldoBase} onChange={(e) => setSueldoBase(e.target.value)} required />
+                  <Form.Control
+                    type="number"
+                    placeholder="650000"
+                    value={sueldoBase}
+                    onChange={(e) => setSueldoBase(e.target.value)}
+                    required
+                  />
                 </InputGroup>
               </Col>
 
@@ -337,25 +388,49 @@ export default function FormularioTrabajador() {
 
               <Col md={4}>
                 <Form.Label className="small fw-semibold">Fecha de Inicio</Form.Label>
-                <Form.Control type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required />
+                <Form.Control
+                  type="date"
+                  value={fechaInicio}
+                  onChange={(e) => setFechaInicio(e.target.value)}
+                  required
+                />
               </Col>
 
               <Col md={4}>
                 <Form.Label className="small fw-semibold">Fecha de Término</Form.Label>
-                <Form.Control type="date" value={fechaTermino} onChange={(e) => setFechaTermino(e.target.value)} />
+                <Form.Control
+                  type="date"
+                  value={fechaTermino}
+                  onChange={(e) => setFechaTermino(e.target.value)}
+                />
                 <Form.Text style={{ fontSize: '0.75rem' }}>Dejar vacío si es indefinido.</Form.Text>
               </Col>
             </Row>
 
             <div className="d-flex flex-column flex-sm-row gap-3 pt-3 border-top">
-              <Button type="submit" variant="success" className="px-4 py-2 fw-bold" disabled={loading}>
+              <Button
+                type="submit"
+                variant="success"
+                className="px-4 py-2 fw-bold"
+                disabled={loading}
+              >
                 {loading ? (
-                  <><Spinner animation="border" size="sm" className="me-2" /> Registrando...</>
+                  <>
+                    <Spinner animation="border" size="sm" className="me-2" /> Registrando...
+                  </>
                 ) : (
-                  <><i className="bi bi-save-fill me-2"></i> Guardar Historial Contractual</>
+                  <>
+                    <i className="bi bi-save-fill me-2"></i> Guardar Historial Contractual
+                  </>
                 )}
               </Button>
-              <Button type="button" variant="outline-secondary" className="px-4 py-2 fw-semibold" onClick={() => setMostrarContrato(false)} disabled={loading}>
+              <Button
+                type="button"
+                variant="outline-secondary"
+                className="px-4 py-2 fw-semibold"
+                onClick={() => setMostrarContrato(false)}
+                disabled={loading}
+              >
                 ← Volver a Identidad
               </Button>
             </div>

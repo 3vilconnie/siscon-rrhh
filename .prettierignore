@@ -1,0 +1,14 @@
+# Artefactos de build y dependencias
+.next/
+out/
+build/
+node_modules/
+
+# Archivos generados / bloqueos
+package-lock.json
+next-env.d.ts
+
+# Otros
+*.min.css
+*.min.js
+public/

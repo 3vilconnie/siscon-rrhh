@@ -7,7 +7,7 @@ export interface Contrato {
   fecha_inicio: string;
   fecha_termino: string | null;
   // Propiedad que a veces devuelve Supabase al hacer count
-  count?: number; 
+  count?: number;
 }
 
 export interface Trabajador {
@@ -17,8 +17,8 @@ export interface Trabajador {
   primer_apellido: string;
   segundo_apellido: string | null;
   contratos?: Contrato[];
-  num_contratos?: number; 
-  genero?: "SR" | "M" | "F" | string;
+  num_contratos?: number;
+  genero?: 'SR' | 'M' | 'F' | string;
 }
 
 export interface AlertaNotificacion {
@@ -71,7 +71,6 @@ export interface ResumenHorasFuncionario {
   horasConsumidasMesSeleccionado: number;
 }
 
-
 type TipoDocumento = 'Finiquito' | 'Contrato' | 'Anexo contrato' | 'Notificación' | 'Otro';
 
 interface FormularioRecepcion {
@@ -82,8 +81,7 @@ interface FormularioRecepcion {
   detalles: DetalleDocumento[];
   quienEntrega: string;
   quienRecibe: string;
-
-}  
+}
 
 export interface DetalleDocumento {
   id: number;

@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
 // OBTENER TODA LA NÓMINA PARA EXPORTACIÓN
@@ -13,7 +13,9 @@ export async function GET() {
     // Traemos todos los trabajadores con sus respectivos contratos
     const { data, error } = await supabaseAdmin
       .from('trabajadores')
-      .select('rut, dv, nombres, primer_apellido, segundo_apellido, contratos(id, fecha_inicio, fecha_termino)');
+      .select(
+        'rut, dv, nombres, primer_apellido, segundo_apellido, contratos(id, fecha_inicio, fecha_termino)',
+      );
 
     if (error) throw error;
 

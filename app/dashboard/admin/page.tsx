@@ -3,7 +3,18 @@
 
 import { useEffect, useState } from 'react';
 import { evaluarAlertaContinuidad } from '@/lib/utils/calculoAlertas';
-import { Card, Row, Col, Form, Table, Badge, Button, Modal, Alert, ListGroup } from 'react-bootstrap';
+import {
+  Card,
+  Row,
+  Col,
+  Form,
+  Table,
+  Badge,
+  Button,
+  Modal,
+  Alert,
+  ListGroup,
+} from 'react-bootstrap';
 import { Trabajador } from '@/types';
 
 interface Usuario {
@@ -35,7 +46,9 @@ export default function ConsolaAdministradorCompleta() {
   const [exportando, setExportando] = useState(false);
 
   const [parametros, setParametros] = useState<ParametrosSistema>({
-    ventana_meses: 15, enfriamiento_meses: 3, minimo_contratos: 2
+    ventana_meses: 15,
+    enfriamiento_meses: 3,
+    minimo_contratos: 2,
   });
   const [guardandoParametros, setGuardandoParametros] = useState(false);
 
@@ -44,7 +57,7 @@ export default function ConsolaAdministradorCompleta() {
     visible: false,
     tipo: 'suspender' as 'suspender' | 'activar' | 'eliminar',
     usuarioId: '',
-    usuarioEmail: ''
+    usuarioEmail: '',
   });
   const [checkConsentimiento, setCheckConsentimiento] = useState(false); // UX para prevenir borrado accidental
   const [procesandoAccion, setProcesandoAccion] = useState(false);
@@ -81,7 +94,7 @@ export default function ConsolaAdministradorCompleta() {
       const res = await fetch('/api/configuraciones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parametros)
+        body: JSON.stringify(parametros),
       });
       if (res.ok) alert('¡Parámetros actualizados! ⚙️✨');
     } finally {
@@ -96,7 +109,7 @@ export default function ConsolaAdministradorCompleta() {
       visible: true,
       tipo,
       usuarioId: u.id,
-      usuarioEmail: u.email
+      usuarioEmail: u.email,
     });
   };
 
@@ -110,17 +123,17 @@ export default function ConsolaAdministradorCompleta() {
         const res = await fetch('/api/admin/usuarios', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: usuarioId })
+          body: JSON.stringify({ id: usuarioId }),
         });
         if (res.ok) cargarDatosConsola();
       } else {
         const res = await fetch('/api/admin/usuarios', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            id: usuarioId, 
-            accion: tipo === 'activar' ? 'activar' : 'suspender' 
-          })
+          body: JSON.stringify({
+            id: usuarioId,
+            accion: tipo === 'activar' ? 'activar' : 'suspender',
+          }),
         });
         if (res.ok) cargarDatosConsola();
       }
@@ -136,7 +149,9 @@ export default function ConsolaAdministradorCompleta() {
     const separador = ';';
     const contenido = [
       columnas.join(separador),
-      ...filas.map(fila => fila.map(celda => `"${String(celda).replace(/"/g, '""')}"`).join(separador))
+      ...filas.map((fila) =>
+        fila.map((celda) => `"${String(celda).replace(/"/g, '""')}"`).join(separador),
+      ),
     ].join('\n');
     const blob = new Blob(['\ufeff' + contenido], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -154,9 +169,27 @@ export default function ConsolaAdministradorCompleta() {
       const res = await fetch('/api/admin/exportar');
       if (!res.ok) throw new Error('Error al extraer datos');
       const data: Trabajador[] = await res.json();
-      const columnas = ['RUT', 'DV', 'Nombres', 'Apellido Paterno', 'Apellido Materno', 'Total Contratos'];
-      const filas = data.map(t => [t.rut, t.dv, t.nombres, t.primer_apellido, t.segundo_apellido || '', t.contratos?.length || 0]);
-      generarArchivoCSV(columnas, filas, `Reporte_Nomina_Completa_${new Date().toISOString().split('T')[0]}`);
+      const columnas = [
+        'RUT',
+        'DV',
+        'Nombres',
+        'Apellido Paterno',
+        'Apellido Materno',
+        'Total Contratos',
+      ];
+      const filas = data.map((t) => [
+        t.rut,
+        t.dv,
+        t.nombres,
+        t.primer_apellido,
+        t.segundo_apellido || '',
+        t.contratos?.length || 0,
+      ]);
+      generarArchivoCSV(
+        columnas,
+        filas,
+        `Reporte_Nomina_Completa_${new Date().toISOString().split('T')[0]}`,
+      );
     } catch (error) {
       alert('Hubo un error al exportar la nómina.');
     } finally {
@@ -170,19 +203,37 @@ export default function ConsolaAdministradorCompleta() {
       const res = await fetch('/api/admin/exportar');
       if (!res.ok) throw new Error('Error al extraer datos');
       const data: Trabajador[] = await res.json();
-      const columnas = ['RUT', 'DV', 'Nombre Completo', 'Contratos Consecutivos', 'Tiene Vigente', 'Fecha Sugerida Retorno'];
+      const columnas = [
+        'RUT',
+        'DV',
+        'Nombre Completo',
+        'Contratos Consecutivos',
+        'Tiene Vigente',
+        'Fecha Sugerida Retorno',
+      ];
       const filas: any[][] = [];
-      data.forEach(t => {
+      data.forEach((t) => {
         const analisis = evaluarAlertaContinuidad(t, parametros);
         if (analisis.califica) {
-          filas.push([t.rut, t.dv, `${t.primer_apellido} ${t.segundo_apellido || ''} ${t.nombres}`.trim().toUpperCase(), analisis.totalContratos, analisis.tieneVigente ? 'SÍ' : 'NO', analisis.fechaSugerida]);
+          filas.push([
+            t.rut,
+            t.dv,
+            `${t.primer_apellido} ${t.segundo_apellido || ''} ${t.nombres}`.trim().toUpperCase(),
+            analisis.totalContratos,
+            analisis.tieneVigente ? 'SÍ' : 'NO',
+            analisis.fechaSugerida,
+          ]);
         }
       });
       if (filas.length === 0) {
         alert('No hay trabajadores en zona de alerta en este momento.');
         return;
       }
-      generarArchivoCSV(columnas, filas, `Reporte_Alertas_Legales_${new Date().toISOString().split('T')[0]}`);
+      generarArchivoCSV(
+        columnas,
+        filas,
+        `Reporte_Alertas_Legales_${new Date().toISOString().split('T')[0]}`,
+      );
     } catch (error) {
       alert('Hubo un error al exportar las alertas.');
     } finally {
@@ -195,9 +246,16 @@ export default function ConsolaAdministradorCompleta() {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="fw-bold text-dark m-0">⚙️ Consola de Administración</h2>
-          <p className="text-muted small m-0">Administración de credenciales, parámetros, auditoría y reportes.</p>
+          <p className="text-muted small m-0">
+            Administración de credenciales, parámetros, auditoría y reportes.
+          </p>
         </div>
-        <Button variant="outline-dark" className="fw-bold small" onClick={cargarDatosConsola} disabled={loading}>
+        <Button
+          variant="outline-dark"
+          className="fw-bold small"
+          onClick={cargarDatosConsola}
+          disabled={loading}
+        >
           <i className="bi bi-arrow-clockwise me-1"></i> Sincronizar
         </Button>
       </div>
@@ -209,13 +267,34 @@ export default function ConsolaAdministradorCompleta() {
             <Form onSubmit={handleGuardarParametros} className="d-flex flex-column gap-3">
               <div>
                 <Form.Label className="small fw-bold">Ventana de Evaluación (Meses)</Form.Label>
-                <Form.Control type="number" value={parametros.ventana_meses} onChange={(e) => setParametros({ ...parametros, ventana_meses: Number(e.target.value) })} min={1} required />
+                <Form.Control
+                  type="number"
+                  value={parametros.ventana_meses}
+                  onChange={(e) =>
+                    setParametros({ ...parametros, ventana_meses: Number(e.target.value) })
+                  }
+                  min={1}
+                  required
+                />
               </div>
               <div>
                 <Form.Label className="small fw-bold">Enfriamiento (Meses)</Form.Label>
-                <Form.Control type="number" value={parametros.enfriamiento_meses} onChange={(e) => setParametros({ ...parametros, enfriamiento_meses: Number(e.target.value) })} min={1} required />
+                <Form.Control
+                  type="number"
+                  value={parametros.enfriamiento_meses}
+                  onChange={(e) =>
+                    setParametros({ ...parametros, enfriamiento_meses: Number(e.target.value) })
+                  }
+                  min={1}
+                  required
+                />
               </div>
-              <Button type="submit" variant="warning" className="fw-bold mt-2" disabled={guardandoParametros}>
+              <Button
+                type="submit"
+                variant="warning"
+                className="fw-bold mt-2"
+                disabled={guardandoParametros}
+              >
                 {guardandoParametros ? 'Guardando...' : 'Actualizar Reglas'}
               </Button>
             </Form>
@@ -225,12 +304,24 @@ export default function ConsolaAdministradorCompleta() {
             <h5 className="fw-bold text-secondary border-bottom pb-2 mb-3">
               <i className="bi bi-file-earmark-excel me-2 text-success"></i>Exportación de Datos
             </h5>
-            <p className="text-muted small mb-3">Descarga la información en formato CSV compatible con Microsoft Excel.</p>
+            <p className="text-muted small mb-3">
+              Descarga la información en formato CSV compatible con Microsoft Excel.
+            </p>
             <div className="d-flex flex-column gap-2">
-              <Button variant="outline-success" className="text-start fw-semibold" onClick={handleExportarNomina} disabled={exportando}>
+              <Button
+                variant="outline-success"
+                className="text-start fw-semibold"
+                onClick={handleExportarNomina}
+                disabled={exportando}
+              >
                 <i className="bi bi-people me-2"></i>Descargar Nómina Completa
               </Button>
-              <Button variant="outline-danger" className="text-start fw-semibold" onClick={handleExportarAlertas} disabled={exportando}>
+              <Button
+                variant="outline-danger"
+                className="text-start fw-semibold"
+                onClick={handleExportarAlertas}
+                disabled={exportando}
+              >
                 <i className="bi bi-exclamation-triangle me-2"></i>Reporte Legal de Alertas
               </Button>
             </div>
@@ -253,13 +344,15 @@ export default function ConsolaAdministradorCompleta() {
                   const res = await fetch('/api/admin/usuarios', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, role })
+                    body: JSON.stringify({ email, role }),
                   });
                   const data = await res.json();
                   if (res.ok) {
-                    alert(`¡Invitación enviada exitosamente a ${email}!\n\nEl usuario recibirá un enlace seguro para acceder y crear su propia contraseña.`);
+                    alert(
+                      `¡Invitación enviada exitosamente a ${email}!\n\nEl usuario recibirá un enlace seguro para acceder y crear su propia contraseña.`,
+                    );
                     form.reset();
-                    cargarDatosConsola(); 
+                    cargarDatosConsola();
                   } else {
                     alert(`Error: ${data.error}`);
                   }
@@ -270,7 +363,12 @@ export default function ConsolaAdministradorCompleta() {
               className="row g-3"
             >
               <Col md={5}>
-                <Form.Control type="email" name="email" placeholder="correo@institucion.cl" required />
+                <Form.Control
+                  type="email"
+                  name="email"
+                  placeholder="correo@institucion.cl"
+                  required
+                />
               </Col>
               <Col md={4}>
                 <Form.Select name="role" required>
@@ -279,7 +377,9 @@ export default function ConsolaAdministradorCompleta() {
                 </Form.Select>
               </Col>
               <Col md={3}>
-                <Button type="submit" variant="primary" className="w-100 fw-bold">Crear Cuenta</Button>
+                <Button type="submit" variant="primary" className="w-100 fw-bold">
+                  Crear Cuenta
+                </Button>
               </Col>
             </Form>
           </Card>
@@ -300,24 +400,42 @@ export default function ConsolaAdministradorCompleta() {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={4} className="text-center py-4">Cargando...</td></tr>
+                    <tr>
+                      <td colSpan={4} className="text-center py-4">
+                        Cargando...
+                      </td>
+                    </tr>
                   ) : (
                     usuarios.map((u) => {
                       const suspendido = !!u.banned_until;
                       return (
                         <tr key={u.id} className={suspendido ? 'table-danger bg-opacity-25' : ''}>
                           <td className="px-3 fw-semibold">{u.email}</td>
-                          <td><Badge bg={u.user_metadata?.role === 'admin' ? 'danger' : 'secondary'}>{u.user_metadata?.role || 'USER'}</Badge></td>
-                          <td>{suspendido ? <Badge bg="danger">Suspendido</Badge> : <Badge bg="success">Activo</Badge>}</td>
+                          <td>
+                            <Badge bg={u.user_metadata?.role === 'admin' ? 'danger' : 'secondary'}>
+                              {u.user_metadata?.role || 'USER'}
+                            </Badge>
+                          </td>
+                          <td>
+                            {suspendido ? (
+                              <Badge bg="danger">Suspendido</Badge>
+                            ) : (
+                              <Badge bg="success">Activo</Badge>
+                            )}
+                          </td>
                           <td className="text-end px-3">
                             <Button
                               size="sm"
                               variant={suspendido ? 'success' : 'outline-warning'}
-                              onClick={() => abrirModalConfirmacion(u, suspendido ? 'activar' : 'suspender')}
+                              onClick={() =>
+                                abrirModalConfirmacion(u, suspendido ? 'activar' : 'suspender')
+                              }
                               className="py-1 px-2 me-2 fw-bold"
-                              title={suspendido ? "Reactivar acceso" : "Suspender temporalmente"}
+                              title={suspendido ? 'Reactivar acceso' : 'Suspender temporalmente'}
                             >
-                              <i className={`bi ${suspendido ? 'bi-play-fill' : 'bi-pause-fill'}`}></i>
+                              <i
+                                className={`bi ${suspendido ? 'bi-play-fill' : 'bi-pause-fill'}`}
+                              ></i>
                             </Button>
                             <Button
                               size="sm"
@@ -347,7 +465,7 @@ export default function ConsolaAdministradorCompleta() {
                 {logs.length === 0 ? (
                   <div className="p-3 text-muted text-center">No hay registros aún.</div>
                 ) : (
-                  logs.map(log => (
+                  logs.map((log) => (
                     <ListGroup.Item key={log.id} className="p-2 border-bottom">
                       <div className="d-flex justify-content-between mb-1">
                         <strong className="text-primary">{log.accion}</strong>
@@ -355,7 +473,9 @@ export default function ConsolaAdministradorCompleta() {
                           {new Date(log.creado_en).toLocaleString('es-CL')}
                         </span>
                       </div>
-                      <div className="text-muted" style={{ fontSize: '11px' }}>{log.detalles}</div>
+                      <div className="text-muted" style={{ fontSize: '11px' }}>
+                        {log.detalles}
+                      </div>
                     </ListGroup.Item>
                   ))
                 )}
@@ -368,7 +488,9 @@ export default function ConsolaAdministradorCompleta() {
       {/* --- MODAL DE SEGURIDAD (react-bootstrap) --- */}
       <Modal
         show={modalConfirmar.visible}
-        onHide={() => !procesandoAccion && setModalConfirmar(prev => ({ ...prev, visible: false }))}
+        onHide={() =>
+          !procesandoAccion && setModalConfirmar((prev) => ({ ...prev, visible: false }))
+        }
         centered
         contentClassName="border-0 shadow-lg"
       >
@@ -378,7 +500,9 @@ export default function ConsolaAdministradorCompleta() {
           className={`border-0 text-white ${modalConfirmar.tipo === 'eliminar' ? 'bg-danger' : 'bg-dark'}`}
         >
           <Modal.Title className="fw-bold h5">
-            <i className={`bi me-2 ${modalConfirmar.tipo === 'eliminar' ? 'bi-exclamation-octagon-fill' : 'bi-shield-exclamation'}`}></i>
+            <i
+              className={`bi me-2 ${modalConfirmar.tipo === 'eliminar' ? 'bi-exclamation-octagon-fill' : 'bi-shield-exclamation'}`}
+            ></i>
             {modalConfirmar.tipo === 'eliminar' && 'Confirmación de Eliminación Crítica'}
             {modalConfirmar.tipo === 'suspender' && 'Confirmación de Suspensión de Operador'}
             {modalConfirmar.tipo === 'activar' && 'Confirmación de Reactivación de Cuenta'}
@@ -386,7 +510,9 @@ export default function ConsolaAdministradorCompleta() {
         </Modal.Header>
 
         <Modal.Body className="p-4">
-          <p className="text-secondary small mb-3">Estás a punto de modificar el estado de la siguiente credencial del sistema:</p>
+          <p className="text-secondary small mb-3">
+            Estás a punto de modificar el estado de la siguiente credencial del sistema:
+          </p>
           <div className="bg-light p-3 rounded mb-3 font-monospace small border">
             <strong>Email:</strong> {modalConfirmar.usuarioEmail} <br />
             <strong>ID Técnico:</strong> {modalConfirmar.usuarioId}
@@ -399,9 +525,14 @@ export default function ConsolaAdministradorCompleta() {
               Esta acción es irreversible y removerá al operador permanentemente.
             </Alert>
           ) : modalConfirmar.tipo === 'suspender' ? (
-            <p className="small text-muted m-0">El usuario no podrá iniciar sesión ni realizar consultas en la base de datos hasta que un administrador levante el bloqueo.</p>
+            <p className="small text-muted m-0">
+              El usuario no podrá iniciar sesión ni realizar consultas en la base de datos hasta que
+              un administrador levante el bloqueo.
+            </p>
           ) : (
-            <p className="small text-muted m-0">Se restaurará el acceso de forma inmediata a los paneles del dashboard contractual.</p>
+            <p className="small text-muted m-0">
+              Se restaurará el acceso de forma inmediata a los paneles del dashboard contractual.
+            </p>
           )}
 
           {/* UX CRÍTICA: Checkbox de consentimiento antes de permitir el clic destructivo */}
@@ -413,7 +544,11 @@ export default function ConsolaAdministradorCompleta() {
                 className="cursor-pointer"
                 checked={checkConsentimiento}
                 onChange={(e) => setCheckConsentimiento(e.target.checked)}
-                label={<span className="small fw-bold text-danger">Comprendo las consecuencias y deseo eliminar definitivamente esta cuenta.</span>}
+                label={
+                  <span className="small fw-bold text-danger">
+                    Comprendo las consecuencias y deseo eliminar definitivamente esta cuenta.
+                  </span>
+                }
               />
             </div>
           )}
@@ -425,7 +560,7 @@ export default function ConsolaAdministradorCompleta() {
             size="sm"
             variant="outline-secondary"
             className="px-3"
-            onClick={() => setModalConfirmar(prev => ({ ...prev, visible: false }))}
+            onClick={() => setModalConfirmar((prev) => ({ ...prev, visible: false }))}
             disabled={procesandoAccion}
           >
             Cancelar
@@ -436,13 +571,14 @@ export default function ConsolaAdministradorCompleta() {
             variant={modalConfirmar.tipo === 'eliminar' ? 'danger' : 'dark'}
             className="fw-bold px-4"
             onClick={ejecutarAccionUsuario}
-            disabled={procesandoAccion || (modalConfirmar.tipo === 'eliminar' && !checkConsentimiento)}
+            disabled={
+              procesandoAccion || (modalConfirmar.tipo === 'eliminar' && !checkConsentimiento)
+            }
           >
             {procesandoAccion ? 'Procesando...' : 'Confirmar Acción'}
           </Button>
         </Modal.Footer>
       </Modal>
-
     </div>
   );
 }

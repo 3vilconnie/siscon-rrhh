@@ -1,8 +1,20 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
-import { Card, Row, Col, Form, Table, Badge, Button, Spinner, Alert, InputGroup, Modal } from 'react-bootstrap';
+import {
+  Card,
+  Row,
+  Col,
+  Form,
+  Table,
+  Badge,
+  Button,
+  Spinner,
+  Alert,
+  InputGroup,
+  Modal,
+} from 'react-bootstrap';
 import { Trabajador, ResumenHorasFuncionario } from '@/types';
 import BuscadorTrabajadores from '@/components/BuscadorTrabajadores';
 import Pagination from '@/components/Pagination';
@@ -14,9 +26,9 @@ interface DetalleConsumo {
   creado_at?: string;
 }
 
-export default function HorasCompensatoriasPage() {
-  const TOPE_ANUAL = 44;
+const TOPE_ANUAL = 44;
 
+export default function HorasCompensatoriasPage() {
   // Estados de Filtro y Datos (Tabla Principal)
   const [anoSeleccionado, setAnoSeleccionado] = useState(new Date().getFullYear());
   const [mesSeleccionado, setMesSeleccionado] = useState(new Date().getMonth() + 1);
@@ -41,23 +53,33 @@ export default function HorasCompensatoriasPage() {
 
   // --- NUEVOS ESTADOS PARA EL MODAL DE DETALLE ---
   const [modalAbierto, setModalAbierto] = useState(false);
-  const [funcionarioSeleccionado, setFuncionarioSeleccionado] = useState<ResumenHorasFuncionario | null>(null);
+  const [funcionarioSeleccionado, setFuncionarioSeleccionado] =
+    useState<ResumenHorasFuncionario | null>(null);
   const [detallesHistorial, setDetallesHistorial] = useState<DetalleConsumo[]>([]);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
 
+  // Declarada antes de los efectos porque el efecto de búsqueda la usa.
+  // useCallback([]) mantiene una referencia estable (solo llama setters).
+  const limpiarCamposTrabajador = useCallback(() => {
+    setDvInput('');
+    setNombresInput('');
+    setPrimerApellidoInput('');
+    setSegundoApellidoInput('');
+    setTrabajadorEncontrado(false);
+  }, []);
+
   // Cargar resumen consolidado
-  const cargarResumenHoras = async () => {
-    setLoadingTabla(true);
+  const cargarResumenHoras = useCallback(async () => {
     try {
       const { data: trabajadores, error: errT } = await supabase
         .from('trabajadores')
         .select('rut, dv, nombres, primer_apellido, segundo_apellido');
-      
+
       if (errT) throw errT;
 
       const fechaInicioAno = `${anoSeleccionado}-01-01`;
       const fechaFinAno = `${anoSeleccionado}-12-31`;
-      
+
       const { data: consumos, error: errC } = await supabase
         .from('registros_horas_compensatorias')
         .select('trabajador_rut, fecha, horas_solicitadas')
@@ -66,41 +88,48 @@ export default function HorasCompensatoriasPage() {
 
       if (errC) throw errC;
 
-      const listaConsolidada: ResumenHorasFuncionario[] = (trabajadores as Trabajador[]).map(t => {
-        const consumosTrabajador = consumos?.filter(c => c.trabajador_rut === t.rut) || [];
-        const totalAno = consumosTrabajador.reduce((sum, item) => sum + Number(item.horas_solicitadas), 0);
-        const totalMes = consumosTrabajador
-          .filter(c => new Date(c.fecha).getUTCMonth() + 1 === mesSeleccionado)
-          .reduce((sum, item) => sum + Number(item.horas_solicitadas), 0);
+      const listaConsolidada: ResumenHorasFuncionario[] = (trabajadores as Trabajador[]).map(
+        (t) => {
+          const consumosTrabajador = consumos?.filter((c) => c.trabajador_rut === t.rut) || [];
+          const totalAno = consumosTrabajador.reduce(
+            (sum, item) => sum + Number(item.horas_solicitadas),
+            0,
+          );
+          const totalMes = consumosTrabajador
+            .filter((c) => new Date(c.fecha).getUTCMonth() + 1 === mesSeleccionado)
+            .reduce((sum, item) => sum + Number(item.horas_solicitadas), 0);
 
-        return {
-          rut: t.rut,
-          dv: t.dv,
-          nombreCompleto: `${t.primer_apellido} ${t.segundo_apellido || ''} ${t.nombres}`.trim().toUpperCase(),
-          horasConsumidasAnuales: totalAno,
-          horasDisponiblesAnuales: Math.max(0, TOPE_ANUAL - totalAno),
-          horasConsumidasMesSeleccionado: totalMes
-        };
-      });
+          return {
+            rut: t.rut,
+            dv: t.dv,
+            nombreCompleto: `${t.primer_apellido} ${t.segundo_apellido || ''} ${t.nombres}`
+              .trim()
+              .toUpperCase(),
+            horasConsumidasAnuales: totalAno,
+            horasDisponiblesAnuales: Math.max(0, TOPE_ANUAL - totalAno),
+            horasConsumidasMesSeleccionado: totalMes,
+          };
+        },
+      );
 
       setResumenes(listaConsolidada);
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
       toast.error('Error al calcular el resumen de horas.');
     } finally {
       setLoadingTabla(false);
     }
-  };
+  }, [anoSeleccionado, mesSeleccionado]);
 
   useEffect(() => {
     cargarResumenHoras();
-  }, [anoSeleccionado, mesSeleccionado]);
+  }, [cargarResumenHoras]);
 
   // Buscar trabajador automáticamente al escribir el RUT
   useEffect(() => {
     const buscarTrabajador = async () => {
       const rutClean = parseInt(rutInput.replace(/[^0-9]/g, ''));
-      
+
       if (!rutClean || isNaN(rutClean)) {
         limpiarCamposTrabajador();
         return;
@@ -134,15 +163,7 @@ export default function HorasCompensatoriasPage() {
     }, 300);
 
     return () => clearTimeout(delayDebounce);
-  }, [rutInput]);
-
-  const limpiarCamposTrabajador = () => {
-    setDvInput('');
-    setNombresInput('');
-    setPrimerApellidoInput('');
-    setSegundoApellidoInput('');
-    setTrabajadorEncontrado(false);
-  };
+  }, [rutInput, limpiarCamposTrabajador]);
 
   const reiniciarFormularioCompleto = () => {
     setRutInput('');
@@ -181,38 +202,43 @@ export default function HorasCompensatoriasPage() {
 
       if (errAcum) throw errAcum;
 
-      const horasConsumidas = acumulado.reduce((sum, item) => sum + Number(item.horas_solicitadas), 0);
-      
+      const horasConsumidas = acumulado.reduce(
+        (sum, item) => sum + Number(item.horas_solicitadas),
+        0,
+      );
+
       if (horasConsumidas + horasNum > TOPE_ANUAL) {
         const disponible = TOPE_ANUAL - horasConsumidas;
-        toast.error(`Cupo insuficiente: Solo quedan ${disponible} hrs disponibles para el año ${anoFechaRegistro}.`, { id: toastId, duration: 5000 });
+        toast.error(
+          `Cupo insuficiente: Solo quedan ${disponible} hrs disponibles para el año ${anoFechaRegistro}.`,
+          { id: toastId, duration: 5000 },
+        );
         setGuardando(false);
         return;
       }
 
-      const { error: errInsert } = await supabase
-        .from('registros_horas_compensatorias')
-        .insert({
-          trabajador_rut: rutClean,
-          fecha: fechaInput,
-          horas_solicitadas: horasNum
-        });
-      
+      const { error: errInsert } = await supabase.from('registros_horas_compensatorias').insert({
+        trabajador_rut: rutClean,
+        fecha: fechaInput,
+        horas_solicitadas: horasNum,
+      });
+
       if (errInsert) {
         if (errInsert.message.includes('la fecha seleccionada ya tiene un registro')) {
           toast.error('La fecha seleccionada ya tiene un registro', { id: toastId });
         } else {
           toast.error(`Error al registrar: ${errInsert.message}`, { id: toastId });
         }
-        return; 
+        return;
       }
       toast.success('Horas compensatorias descontadas exitosamente.', { id: toastId });
-      
-      reiniciarFormularioCompleto();
-      await cargarResumenHoras();
 
-    } catch (error: any) {
-      toast.error(`Error de base de datos: ${error.message}`, { id: toastId });
+      reiniciarFormularioCompleto();
+      setLoadingTabla(true);
+      await cargarResumenHoras();
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      toast.error(`Error de base de datos: ${message}`, { id: toastId });
     } finally {
       setGuardando(false);
     }
@@ -235,9 +261,8 @@ export default function HorasCompensatoriasPage() {
 
       if (error) throw error;
       setDetallesHistorial(data || []);
-    } catch (err: any) {
-      console.error(err);
-      toast.error('No se pudo cargar el desglose detallado.');
+    } catch (err) {
+      toast.error(`No se pudo cargar el desglose detallado ${err}.`);
     } finally {
       setLoadingDetalle(false);
     }
@@ -262,13 +287,18 @@ export default function HorasCompensatoriasPage() {
 
   const indiceUltimoRegistro = paginaActual * registrosPorPagina;
   const indicePrimerRegistro = indiceUltimoRegistro - registrosPorPagina;
-  const registrosPaginaActual = resumenesFiltrados.slice(indicePrimerRegistro, indiceUltimoRegistro);
+  const registrosPaginaActual = resumenesFiltrados.slice(
+    indicePrimerRegistro,
+    indiceUltimoRegistro,
+  );
 
   return (
     <div className="container-fluid">
       <div className="mb-4">
         <h2 className="fw-bold text-dark m-0">📊 Control de Horas Compensatorias</h2>
-        <p className="text-muted small">Gestión de rebajas con tope de {TOPE_ANUAL} horas anuales por funcionario institucional.</p>
+        <p className="text-muted small">
+          Gestión de rebajas con tope de {TOPE_ANUAL} horas anuales por funcionario institucional.
+        </p>
       </div>
 
       <Row className="g-4">
@@ -335,7 +365,10 @@ export default function HorasCompensatoriasPage() {
               </Row>
 
               {rutInput && !trabajadorEncontrado && (
-                <Alert variant="warning" className="py-2 small m-0 border-0 shadow-sm font-monospace text-center">
+                <Alert
+                  variant="warning"
+                  className="py-2 small m-0 border-0 shadow-sm font-monospace text-center"
+                >
                   ⚠️ RUT no registrado en el sistema.
                 </Alert>
               )}
@@ -382,7 +415,7 @@ export default function HorasCompensatoriasPage() {
 
         {/* REPORTE CON BUSCADOR, BOTÓN DE DETALLE Y PAGINACIÓN */}
         <Col xs={12} xl={8}>
-          <BuscadorTrabajadores 
+          <BuscadorTrabajadores
             busqueda={busqueda}
             setBusqueda={setBusqueda}
             totalFiltrados={totalRegistros}
@@ -392,11 +425,19 @@ export default function HorasCompensatoriasPage() {
           <Card className="shadow-sm border-0 bg-white p-4">
             <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center border-bottom pb-3 mb-3 gap-2">
               <h5 className="fw-bold text-secondary m-0">
-                <i className="bi bi-calendar-check me-2 text-primary"></i>Resumen de Saldos del Personal
+                <i className="bi bi-calendar-check me-2 text-primary"></i>Resumen de Saldos del
+                Personal
               </h5>
 
               <div className="d-flex gap-2">
-                <Form.Select size="sm" value={mesSeleccionado} onChange={(e) => setMesSeleccionado(Number(e.target.value))}>
+                <Form.Select
+                  size="sm"
+                  value={mesSeleccionado}
+                  onChange={(e) => {
+                    setLoadingTabla(true);
+                    setMesSeleccionado(Number(e.target.value));
+                  }}
+                >
                   <option value={1}>Enero</option>
                   <option value={2}>Febrero</option>
                   <option value={3}>Marzo</option>
@@ -411,7 +452,14 @@ export default function HorasCompensatoriasPage() {
                   <option value={12}>Diciembre</option>
                 </Form.Select>
 
-                <Form.Select size="sm" value={anoSeleccionado} onChange={(e) => setAnoSeleccionado(Number(e.target.value))}>
+                <Form.Select
+                  size="sm"
+                  value={anoSeleccionado}
+                  onChange={(e) => {
+                    setLoadingTabla(true);
+                    setAnoSeleccionado(Number(e.target.value));
+                  }}
+                >
                   <option value={2025}>2025</option>
                   <option value={2026}>2026</option>
                   <option value={2027}>2027</option>
@@ -449,14 +497,30 @@ export default function HorasCompensatoriasPage() {
                       <tr key={r.rut} className="text-center">
                         <td className="text-start ps-3">
                           <div className="fw-bold text-dark">{r.nombreCompleto}</div>
-                          <span className="text-muted font-monospace" style={{ fontSize: '11px' }}>RUT: {r.rut}-{r.dv}</span>
+                          <span className="text-muted font-monospace" style={{ fontSize: '11px' }}>
+                            RUT: {r.rut}-{r.dv}
+                          </span>
                         </td>
-                        <td className="fw-semibold text-primary">{r.horasConsumidasMesSeleccionado} hrs</td>
-                        <td className="fw-semibold text-danger">{r.horasConsumidasAnuales} / {TOPE_ANUAL} hrs</td>
+                        <td className="fw-semibold text-primary">
+                          {r.horasConsumidasMesSeleccionado} hrs
+                        </td>
+                        <td className="fw-semibold text-danger">
+                          {r.horasConsumidasAnuales} / {TOPE_ANUAL} hrs
+                        </td>
                         <td>
                           <Badge
-                            bg={r.horasDisponiblesAnuales <= 5 ? 'danger' : r.horasDisponiblesAnuales <= 15 ? 'warning' : 'success'}
-                            text={r.horasDisponiblesAnuales > 5 && r.horasDisponiblesAnuales <= 15 ? 'dark' : undefined}
+                            bg={
+                              r.horasDisponiblesAnuales <= 5
+                                ? 'danger'
+                                : r.horasDisponiblesAnuales <= 15
+                                  ? 'warning'
+                                  : 'success'
+                            }
+                            text={
+                              r.horasDisponiblesAnuales > 5 && r.horasDisponiblesAnuales <= 15
+                                ? 'dark'
+                                : undefined
+                            }
                             className="px-2 py-1"
                           >
                             {r.horasDisponiblesAnuales} hrs libres
@@ -493,7 +557,12 @@ export default function HorasCompensatoriasPage() {
       </Row>
 
       {/* --- MODAL DE DETALLE (react-bootstrap) --- */}
-      <Modal show={modalAbierto} onHide={() => setModalAbierto(false)} centered contentClassName="border-0 shadow-lg">
+      <Modal
+        show={modalAbierto}
+        onHide={() => setModalAbierto(false)}
+        centered
+        contentClassName="border-0 shadow-lg"
+      >
         <Modal.Header closeButton closeVariant="white" className="bg-dark text-white border-0">
           <Modal.Title className="fw-bold h5">
             <i className="bi bi-journal-text me-2 text-primary"></i>
@@ -503,22 +572,32 @@ export default function HorasCompensatoriasPage() {
         <Modal.Body className="p-4">
           {funcionarioSeleccionado && (
             <div className="mb-3 bg-light p-3 rounded shadow-sm">
-              <div className="fw-bold text-dark text-uppercase">{funcionarioSeleccionado.nombreCompleto}</div>
-              <div className="text-muted small font-monospace">RUT: {funcionarioSeleccionado.rut}-{funcionarioSeleccionado.dv}</div>
+              <div className="fw-bold text-dark text-uppercase">
+                {funcionarioSeleccionado.nombreCompleto}
+              </div>
+              <div className="text-muted small font-monospace">
+                RUT: {funcionarioSeleccionado.rut}-{funcionarioSeleccionado.dv}
+              </div>
               <Row className="mt-2 text-center border-top pt-2">
                 <Col xs={6} className="border-end">
                   <small className="text-muted d-block">Consumido en {anoSeleccionado}</small>
-                  <span className="fw-bold text-danger">{funcionarioSeleccionado.horasConsumidasAnuales} hrs</span>
+                  <span className="fw-bold text-danger">
+                    {funcionarioSeleccionado.horasConsumidasAnuales} hrs
+                  </span>
                 </Col>
                 <Col xs={6}>
                   <small className="text-muted d-block">Saldo Libre</small>
-                  <span className="fw-bold text-success">{funcionarioSeleccionado.horasDisponiblesAnuales} hrs</span>
+                  <span className="fw-bold text-success">
+                    {funcionarioSeleccionado.horasDisponiblesAnuales} hrs
+                  </span>
                 </Col>
               </Row>
             </div>
           )}
 
-          <h6 className="fw-bold text-secondary mb-2 border-bottom pb-1">Fechas y Cupos Solicitados ({anoSeleccionado})</h6>
+          <h6 className="fw-bold text-secondary mb-2 border-bottom pb-1">
+            Fechas y Cupos Solicitados ({anoSeleccionado})
+          </h6>
 
           <div className="table-responsive" style={{ maxHeight: '250px', overflowY: 'auto' }}>
             <Table striped size="sm" className="align-middle m-0 text-center">
@@ -539,7 +618,9 @@ export default function HorasCompensatoriasPage() {
                   </tr>
                 ) : detallesHistorial.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="py-4 text-muted small">No registra rebajas de horas compensatorias en este período.</td>
+                    <td colSpan={3} className="py-4 text-muted small">
+                      No registra rebajas de horas compensatorias en este período.
+                    </td>
                   </tr>
                 ) : (
                   detallesHistorial.map((d, index) => (
@@ -549,7 +630,7 @@ export default function HorasCompensatoriasPage() {
                         {new Date(d.fecha + 'T00:00:00').toLocaleDateString('es-CL', {
                           day: '2-digit',
                           month: '2-digit',
-                          year: 'numeric'
+                          year: 'numeric',
                         })}
                       </td>
                       <td className="fw-bold text-danger">{d.horas_solicitadas} hrs</td>
@@ -561,7 +642,13 @@ export default function HorasCompensatoriasPage() {
           </div>
         </Modal.Body>
         <Modal.Footer className="border-0 bg-light py-2">
-          <Button type="button" variant="secondary" size="sm" className="fw-bold" onClick={() => setModalAbierto(false)}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="fw-bold"
+            onClick={() => setModalAbierto(false)}
+          >
             Cerrar Ventana
           </Button>
         </Modal.Footer>

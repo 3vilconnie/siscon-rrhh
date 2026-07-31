@@ -22,7 +22,7 @@ export default function NominatrabajadoresPage() {
 
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>({
     key: 'nombre',
-    direction: 'asc'
+    direction: 'asc',
   });
 
   const [paginaActual, setPaginaActual] = useState(1);
@@ -47,9 +47,7 @@ export default function NominatrabajadoresPage() {
   useEffect(() => {
     async function cargarTrabajadores() {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('trabajadores')
-        .select(`
+      const { data, error } = await supabase.from('trabajadores').select(`
           rut, dv, nombres, primer_apellido, segundo_apellido,
           contratos(count)
         `);
@@ -70,7 +68,7 @@ export default function NominatrabajadoresPage() {
             nombres: t.nombres,
             primer_apellido: t.primer_apellido,
             segundo_apellido: t.segundo_apellido,
-            num_contratos: Number(conteo) || 0
+            num_contratos: Number(conteo) || 0,
           };
         });
         setTrabajadores(listaNormalizada);
@@ -85,8 +83,10 @@ export default function NominatrabajadoresPage() {
     // A) Aplicar Filtro de texto
     const término = busquedaDebounced.toLowerCase().trim();
     const rutCompleto = `${t.rut}-${t.dv}`.toLowerCase();
-    const nombreCompleto = `${t.nombres} ${t.primer_apellido} ${t.segundo_apellido || ''}`.toLowerCase();
-    const coincideTexto = !término || rutCompleto.includes(término) || nombreCompleto.includes(término);
+    const nombreCompleto =
+      `${t.nombres} ${t.primer_apellido} ${t.segundo_apellido || ''}`.toLowerCase();
+    const coincideTexto =
+      !término || rutCompleto.includes(término) || nombreCompleto.includes(término);
 
     // B) Aplicar Filtro Rápido de Contratos
     let coincideContrato = true;
@@ -125,10 +125,15 @@ export default function NominatrabajadoresPage() {
   };
 
   const renderSortIcon = (key: SortKey) => {
-    if (sortConfig?.key !== key) return <i className="bi bi-arrow-down-up text-white-50 ms-1" style={{ fontSize: '0.75rem' }}></i>;
-    return sortConfig.direction === 'asc' 
-      ? <i className="bi bi-sort-up-alt text-info ms-1 fs-6"></i>
-      : <i className="bi bi-sort-down text-info ms-1 fs-6"></i>;
+    if (sortConfig?.key !== key)
+      return (
+        <i className="bi bi-arrow-down-up text-white-50 ms-1" style={{ fontSize: '0.75rem' }}></i>
+      );
+    return sortConfig.direction === 'asc' ? (
+      <i className="bi bi-sort-up-alt text-info ms-1 fs-6"></i>
+    ) : (
+      <i className="bi bi-sort-down text-info ms-1 fs-6"></i>
+    );
   };
 
   const totalRegistros = trabajadoresOrdenados.length;
@@ -136,7 +141,10 @@ export default function NominatrabajadoresPage() {
 
   const indiceUltimoRegistro = paginaActual * registrosPorPagina;
   const indicePrimerRegistro = indiceUltimoRegistro - registrosPorPagina;
-  const registrosPaginaActual = trabajadoresOrdenados.slice(indicePrimerRegistro, indiceUltimoRegistro);
+  const registrosPaginaActual = trabajadoresOrdenados.slice(
+    indicePrimerRegistro,
+    indiceUltimoRegistro,
+  );
 
   const obtenerBadgeClase = (cantidad: number) => {
     if (cantidad === 2) return 'bg-warning text-dark';
@@ -149,9 +157,16 @@ export default function NominatrabajadoresPage() {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="fw-bold text-dark m-0">Nómina de Trabajadores</h2>
-          <p className="text-muted small">Visualización general del personal y estado contractual.</p>
+          <p className="text-muted small">
+            Visualización general del personal y estado contractual.
+          </p>
         </div>
-        <Button as={Link as any} href="/dashboard/formulario" variant="primary" className="fw-bold small">
+        <Button
+          as={Link as any}
+          href="/dashboard/formulario"
+          variant="primary"
+          className="fw-bold small"
+        >
           <i className="bi bi-person-plus-fill me-1"></i> Nuevo Trabajador
         </Button>
       </div>
@@ -185,7 +200,10 @@ export default function NominatrabajadoresPage() {
         <Button
           size="sm"
           variant={filtoRapido === 'todos' ? 'dark' : 'outline-secondary'}
-          onClick={() => { setFiltroRapido('todos'); setPaginaActual(1); }}
+          onClick={() => {
+            setFiltroRapido('todos');
+            setPaginaActual(1);
+          }}
           className="rounded-pill px-3 fw-semibold"
         >
           Todos ({trabajadores.length})
@@ -193,36 +211,45 @@ export default function NominatrabajadoresPage() {
         <Button
           size="sm"
           variant={filtoRapido === 'unico' ? 'info' : 'outline-info'}
-          onClick={() => { setFiltroRapido('unico'); setPaginaActual(1); }}
+          onClick={() => {
+            setFiltroRapido('unico');
+            setPaginaActual(1);
+          }}
           className={`rounded-pill px-3 fw-semibold ${filtoRapido === 'unico' ? 'text-dark' : ''}`}
         >
-          Contrato Único ({trabajadores.filter(t => t.num_contratos === 1).length})
+          Contrato Único ({trabajadores.filter((t) => t.num_contratos === 1).length})
         </Button>
         <Button
           size="sm"
           variant={filtoRapido === 'alerta' ? 'warning' : 'outline-warning'}
-          onClick={() => { setFiltroRapido('alerta'); setPaginaActual(1); }}
+          onClick={() => {
+            setFiltroRapido('alerta');
+            setPaginaActual(1);
+          }}
           className={`rounded-pill px-3 fw-semibold ${filtoRapido === 'alerta' ? 'text-dark' : ''}`}
         >
-          En Alerta (2) ({trabajadores.filter(t => t.num_contratos === 2).length})
+          En Alerta (2) ({trabajadores.filter((t) => t.num_contratos === 2).length})
         </Button>
         <Button
           size="sm"
           variant={filtoRapido === 'critico' ? 'danger' : 'outline-danger'}
-          onClick={() => { setFiltroRapido('critico'); setPaginaActual(1); }}
+          onClick={() => {
+            setFiltroRapido('critico');
+            setPaginaActual(1);
+          }}
           className="rounded-pill px-3 fw-semibold"
         >
-          Críticos (3+) ({trabajadores.filter(t => (t.num_contratos || 0) >= 3).length})
+          Críticos (3+) ({trabajadores.filter((t) => (t.num_contratos || 0) >= 3).length})
         </Button>
       </div>
 
       <div className="d-flex justify-content-between align-items-center mb-3 small text-muted">
         <div>
-          Mostrando desde el <strong>{totalRegistros === 0 ? 0 : indicePrimerRegistro + 1}</strong> al{' '}
-          <strong>{Math.min(indiceUltimoRegistro, totalRegistros)}</strong> de un total de{' '}
+          Mostrando desde el <strong>{totalRegistros === 0 ? 0 : indicePrimerRegistro + 1}</strong>{' '}
+          al <strong>{Math.min(indiceUltimoRegistro, totalRegistros)}</strong> de un total de{' '}
           <strong>{totalRegistros}</strong> registros.
         </div>
-        
+
         <div className="d-flex align-items-center gap-2">
           <span>Mostrar:</span>
           <Form.Select
@@ -248,26 +275,56 @@ export default function NominatrabajadoresPage() {
           <Table hover className="align-middle m-0">
             <thead className="table-dark text-uppercase small user-select-none">
               <tr>
-                <th className="px-3 py-3" style={{ width: '15%', cursor: 'pointer' }} onClick={() => handleSort('rut')}>
+                <th
+                  className="px-3 py-3"
+                  style={{ width: '15%', cursor: 'pointer' }}
+                  onClick={() => handleSort('rut')}
+                >
                   RUT {renderSortIcon('rut')}
                 </th>
-                <th className="py-3" style={{ width: '45%', cursor: 'pointer' }} onClick={() => handleSort('nombre')}>
+                <th
+                  className="py-3"
+                  style={{ width: '45%', cursor: 'pointer' }}
+                  onClick={() => handleSort('nombre')}
+                >
                   Nombre Completo {renderSortIcon('nombre')}
                 </th>
-                <th className="py-3 text-center" style={{ width: '20%', cursor: 'pointer' }} onClick={() => handleSort('num_contratos')}>
+                <th
+                  className="py-3 text-center"
+                  style={{ width: '20%', cursor: 'pointer' }}
+                  onClick={() => handleSort('num_contratos')}
+                >
                   N° Contratos {renderSortIcon('num_contratos')}
                 </th>
-                <th className="px-3 py-3 text-end" style={{ width: '20%' }}>Acciones</th>
+                <th className="px-3 py-3 text-end" style={{ width: '20%' }}>
+                  Acciones
+                </th>
               </tr>
             </thead>
             <tbody className="small">
               {loading ? (
                 [...Array(5)].map((_, idx) => (
                   <tr key={`skeleton-${idx}`}>
-                    <td className="px-3 py-3"><p className="placeholder-glow m-0"><span className="placeholder col-8 rounded"></span></p></td>
-                    <td className="py-3"><p className="placeholder-glow m-0"><span className="placeholder col-6 rounded"></span></p></td>
-                    <td className="py-3 text-center"><p className="placeholder-glow m-0"><span className="placeholder col-4 bg-secondary rounded"></span></p></td>
-                    <td className="px-3 py-3 text-end"><p className="placeholder-glow m-0"><span className="placeholder col-7 bg-primary rounded"></span></p></td>
+                    <td className="px-3 py-3">
+                      <p className="placeholder-glow m-0">
+                        <span className="placeholder col-8 rounded"></span>
+                      </p>
+                    </td>
+                    <td className="py-3">
+                      <p className="placeholder-glow m-0">
+                        <span className="placeholder col-6 rounded"></span>
+                      </p>
+                    </td>
+                    <td className="py-3 text-center">
+                      <p className="placeholder-glow m-0">
+                        <span className="placeholder col-4 bg-secondary rounded"></span>
+                      </p>
+                    </td>
+                    <td className="px-3 py-3 text-end">
+                      <p className="placeholder-glow m-0">
+                        <span className="placeholder col-7 bg-primary rounded"></span>
+                      </p>
+                    </td>
                   </tr>
                 ))
               ) : registrosPaginaActual.length === 0 ? (
@@ -276,12 +333,17 @@ export default function NominatrabajadoresPage() {
                   <td colSpan={4} className="text-center py-5 bg-white text-muted">
                     <i className="bi bi-person-x display-4 text-secondary mb-3 d-block"></i>
                     <h5 className="fw-bold text-dark mb-1">No se encontraron resultados</h5>
-                    <p className="small text-muted mb-3">Ningún trabajador coincide con los criterios o filtros actuales.</p>
+                    <p className="small text-muted mb-3">
+                      Ningún trabajador coincide con los criterios o filtros actuales.
+                    </p>
                     <Button
                       size="sm"
                       variant="outline-secondary"
                       className="fw-semibold rounded-pill px-3"
-                      onClick={() => { setBusqueda(''); setFiltroRapido('todos'); }}
+                      onClick={() => {
+                        setBusqueda('');
+                        setFiltroRapido('todos');
+                      }}
                     >
                       Limpiar Filtros
                     </Button>
@@ -290,7 +352,9 @@ export default function NominatrabajadoresPage() {
               ) : (
                 registrosPaginaActual.map((t) => (
                   <tr key={t.rut}>
-                    <td className="px-3 fw-bold">{t.rut}-{t.dv}</td>
+                    <td className="px-3 fw-bold">
+                      {t.rut}-{t.dv}
+                    </td>
                     <td className="text-uppercase">
                       {t.primer_apellido} {t.segundo_apellido || ''} {t.nombres}
                     </td>
@@ -300,7 +364,13 @@ export default function NominatrabajadoresPage() {
                       </span>
                     </td>
                     <td className="px-3 text-end">
-                      <Button as={Link as any} href={`/dashboard/trabajadores/${t.rut}`} size="sm" variant="outline-primary" className="py-1">
+                      <Button
+                        as={Link as any}
+                        href={`/dashboard/trabajadores/${t.rut}`}
+                        size="sm"
+                        variant="outline-primary"
+                        className="py-1"
+                      >
                         <i className="bi bi-eye-fill me-1"></i> Ver Detalle
                       </Button>
                     </td>
@@ -312,7 +382,7 @@ export default function NominatrabajadoresPage() {
         </div>
       </Card>
 
-      <Pagination 
+      <Pagination
         paginaActual={paginaActual}
         totalPaginas={totalPaginas}
         onPaginaChange={(numero) => setPaginaActual(numero)}

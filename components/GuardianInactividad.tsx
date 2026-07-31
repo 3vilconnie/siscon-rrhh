@@ -8,14 +8,14 @@ export default function GuardiánInactividad({ children }: { children: React.Rea
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 2 horas en milisegundos = 2 * 60 * 60 * 1000
-  const TIEMPO_INACTIVIDAD = 2 * 60 * 60 * 1000; 
+  const TIEMPO_INACTIVIDAD = 2 * 60 * 60 * 1000;
 
   const cerrarSesionPorInactividad = async () => {
     console.log('Sesión expirada por inactividad de 2 horas.');
-    
+
     // 1. Destruir la sesión en Supabase Auth
     await supabase.auth.signOut();
-    
+
     // 2. Redirigir al login institucional
     router.push('/login');
     router.refresh();

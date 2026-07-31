@@ -9,8 +9,10 @@ export default function RootPage() {
 
   useEffect(() => {
     async function verificarSesion() {
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (session) {
         router.push('/dashboard/trabajadores');
       } else {

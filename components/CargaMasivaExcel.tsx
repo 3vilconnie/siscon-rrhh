@@ -17,7 +17,7 @@ interface ArchivoPrevia {
 export default function CargaMasivaExcel() {
   const [archivos, setArchivos] = useState<ArchivoPrevia[]>([]);
   const [procesando, setProcesando] = useState(false);
-  const [isDragging, setIsCollapsed] = useState(false); 
+  const [isDragging, setIsCollapsed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Convertir bytes a un formato legible por humanos
@@ -32,13 +32,13 @@ export default function CargaMasivaExcel() {
   // Manejar la selección manual o por drop de archivos
   const agregarArchivosALista = (filesList: FileList) => {
     const nuevos = Array.from(filesList)
-      .filter(file => file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))
-      .map(file => ({
+      .filter((file) => file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))
+      .map((file) => ({
         id: crypto.randomUUID(),
         file,
         nombre: file.name,
         tamano: formatearTamano(file.size),
-        estado: 'pendiente' as const
+        estado: 'pendiente' as const,
       }));
 
     if (nuevos.length === 0) {
@@ -46,7 +46,7 @@ export default function CargaMasivaExcel() {
       return;
     }
 
-    setArchivos(prev => [...prev, ...nuevos]);
+    setArchivos((prev) => [...prev, ...nuevos]);
   };
 
   // Eventos de Drag & Drop (Nativos y fluidos)
@@ -68,7 +68,7 @@ export default function CargaMasivaExcel() {
   };
 
   const removerArchivo = (id: string) => {
-    setArchivos(prev => prev.filter(a => a.id !== id));
+    setArchivos((prev) => prev.filter((a) => a.id !== id));
   };
 
   // Transforma fechas de formato DD/MM/AAAA a AAAA-MM-DD (Requerido por PostgreSQL)
@@ -94,7 +94,7 @@ export default function CargaMasivaExcel() {
       const workbook = XLSX.read(buffer, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      
+
       const filas: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 7 });
 
       if (filas.length === 0) {
@@ -111,7 +111,7 @@ export default function CargaMasivaExcel() {
           dv: String(dv).toUpperCase().trim(),
           primer_apellido: String(primerAp).toUpperCase().trim(),
           segundo_apellido: segundoAp ? String(segundoAp).toUpperCase().trim() : null,
-          nombres: String(nombres).toUpperCase().trim()
+          nombres: String(nombres).toUpperCase().trim(),
         });
         if (errT) throw errT;
 
@@ -121,7 +121,7 @@ export default function CargaMasivaExcel() {
           jornada: parseInt(jornada) || 44,
           sueldo_base: parseFloat(sueldo) || 0,
           fecha_inicio: formatearFechaExcel(fechaIni),
-          fecha_termino: fechaTerm ? formatearFechaExcel(fechaTerm) : null
+          fecha_termino: fechaTerm ? formatearFechaExcel(fechaTerm) : null,
         });
         if (errC) throw errC;
       }
@@ -160,9 +160,11 @@ export default function CargaMasivaExcel() {
       setArchivos([...listaModificable]);
     }
 
-    const errores = listaModificable.filter(a => a.estado === 'error').length;
+    const errores = listaModificable.filter((a) => a.estado === 'error').length;
     if (errores > 0) {
-      toast.error(`Cola finalizada con ${errores} planillas rechazadas. Revisa el desglose.`, { id: toastId });
+      toast.error(`Cola finalizada con ${errores} planillas rechazadas. Revisa el desglose.`, {
+        id: toastId,
+      });
     } else {
       toast.success('¡Todas las planillas SIGPER se procesaron con éxito!', { id: toastId });
       setArchivos([]); // Limpiar la lista solo si todo fue perfecto
@@ -173,40 +175,54 @@ export default function CargaMasivaExcel() {
   return (
     <Card className="shadow-sm border-0 bg-white mx-auto w-100" style={{ maxWidth: '800px' }}>
       <Card.Header className="bg-dark text-white fw-bold d-flex align-items-center">
-        <i className="bi bi-cloud-arrow-up-fill me-2 fs-5 text-primary"></i> Procesador Masivo de Reportes SIGPER
+        <i className="bi bi-cloud-arrow-up-fill me-2 fs-5 text-primary"></i> Procesador Masivo de
+        Reportes SIGPER
       </Card.Header>
 
       <Card.Body className="p-4 p-md-5">
-        <div 
+        <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => !procesando && fileInputRef.current?.click()}
           className={`border border-2 border-dashed rounded p-5 text-center position-relative transition-all cursor-pointer ${
-            isDragging ? 'border-primary bg-primary bg-opacity-10 text-primaryScale' : 'border-secondary bg-light text-muted'
+            isDragging
+              ? 'border-primary bg-primary bg-opacity-10 text-primaryScale'
+              : 'border-secondary bg-light text-muted'
           }`}
           style={{ transition: 'all 0.2s ease', pointerEvents: procesando ? 'none' : 'auto' }}
         >
-          <input 
-            type="file" 
+          <input
+            type="file"
             ref={fileInputRef}
-            className="d-none" 
-            multiple 
+            className="d-none"
+            multiple
             accept=".xlsx, .xls"
             onChange={(e) => e.target.files && agregarArchivosALista(e.target.files)}
           />
-          <i className={`bi bi-file-earmark-excel display-3 mb-3 d-block ${isDragging ? 'text-primary' : 'text-success'}`}></i>
+          <i
+            className={`bi bi-file-earmark-excel display-3 mb-3 d-block ${isDragging ? 'text-primary' : 'text-success'}`}
+          ></i>
           <h5 className="fw-bold text-dark mb-1">Arrastra tus planillas SIGPER aquí</h5>
-          <p className="small m-0 text-secondary">O haz clic para explorar tus carpetas locales (Soporta carga múltiple en bloque)</p>
+          <p className="small m-0 text-secondary">
+            O haz clic para explorar tus carpetas locales (Soporta carga múltiple en bloque)
+          </p>
         </div>
 
         {/* LISTADO DE PREVISUALIZACIÓN ANTES DE SUBIR */}
         {archivos.length > 0 && (
           <div className="mt-4 animate__animated animate__fadeIn">
             <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-              <h6 className="fw-bold text-secondary m-0">Cola de archivos listos para procesar ({archivos.length})</h6>
+              <h6 className="fw-bold text-secondary m-0">
+                Cola de archivos listos para procesar ({archivos.length})
+              </h6>
               {!procesando && (
-                <Button variant="link" size="sm" className="text-danger text-decoration-none p-0 small fw-semibold" onClick={() => setArchivos([])}>
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="text-danger text-decoration-none p-0 small fw-semibold"
+                  onClick={() => setArchivos([])}
+                >
                   Vaciar Cola
                 </Button>
               )}
@@ -214,24 +230,55 @@ export default function CargaMasivaExcel() {
 
             <div className="list-group gap-2 overflow-auto ps-1" style={{ maxHeight: '280px' }}>
               {archivos.map((item) => (
-                <div 
-                  key={item.id} 
+                <div
+                  key={item.id}
                   className={`list-group-item d-flex justify-content-between align-items-center rounded border shadow-sm p-3 transition-all ${
-                    item.estado === 'exito' ? 'border-success bg-success bg-opacity-10' :
-                    item.estado === 'error' ? 'border-danger bg-danger bg-opacity-10' :
-                    item.estado === 'procesando' ? 'border-primary bg-light' : 'bg-white'
+                    item.estado === 'exito'
+                      ? 'border-success bg-success bg-opacity-10'
+                      : item.estado === 'error'
+                        ? 'border-danger bg-danger bg-opacity-10'
+                        : item.estado === 'procesando'
+                          ? 'border-primary bg-light'
+                          : 'bg-white'
                   }`}
                 >
-                  <div className="d-flex align-items-center gap-3 text-truncate" style={{ maxWidth: '75%' }}>
-                    {item.estado === 'exito' && <i className="bi bi-check-circle-fill text-success fs-5"></i>}
-                    {item.estado === 'error' && <i className="bi bi-x-circle-fill text-danger fs-5"></i>}
-                    {item.estado === 'procesando' && <Spinner animation="border" size="sm" className="text-primary" role="status" />}
-                    {item.estado === 'pendiente' && <i className="bi bi-file-earmark-arrow-up text-secondary fs-5"></i>}
-                    
+                  <div
+                    className="d-flex align-items-center gap-3 text-truncate"
+                    style={{ maxWidth: '75%' }}
+                  >
+                    {item.estado === 'exito' && (
+                      <i className="bi bi-check-circle-fill text-success fs-5"></i>
+                    )}
+                    {item.estado === 'error' && (
+                      <i className="bi bi-x-circle-fill text-danger fs-5"></i>
+                    )}
+                    {item.estado === 'procesando' && (
+                      <Spinner
+                        animation="border"
+                        size="sm"
+                        className="text-primary"
+                        role="status"
+                      />
+                    )}
+                    {item.estado === 'pendiente' && (
+                      <i className="bi bi-file-earmark-arrow-up text-secondary fs-5"></i>
+                    )}
+
                     <div className="text-truncate">
-                      <span className="fw-bold text-dark d-block text-truncate small" title={item.nombre}>{item.nombre}</span>
-                      <span className="text-muted font-monospace" style={{ fontSize: '0.72rem' }}>Tamaño: {item.tamano}</span>
-                      {item.detalle && <span className="d-block text-muted" style={{ fontSize: '0.7rem' }}>{item.detalle}</span>}
+                      <span
+                        className="fw-bold text-dark d-block text-truncate small"
+                        title={item.nombre}
+                      >
+                        {item.nombre}
+                      </span>
+                      <span className="text-muted font-monospace" style={{ fontSize: '0.72rem' }}>
+                        Tamaño: {item.tamano}
+                      </span>
+                      {item.detalle && (
+                        <span className="d-block text-muted" style={{ fontSize: '0.7rem' }}>
+                          {item.detalle}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -258,12 +305,19 @@ export default function CargaMasivaExcel() {
                 variant="success"
                 className="fw-bold px-4 py-2"
                 onClick={handleProcesarBloque}
-                disabled={procesando || archivos.filter(a => a.estado === 'pendiente').length === 0}
+                disabled={
+                  procesando || archivos.filter((a) => a.estado === 'pendiente').length === 0
+                }
               >
                 {procesando ? (
-                  <><Spinner animation="border" size="sm" className="me-2" /> Sincronizando Bloque...</>
+                  <>
+                    <Spinner animation="border" size="sm" className="me-2" /> Sincronizando
+                    Bloque...
+                  </>
                 ) : (
-                  <><i className="bi bi-play-circle-fill me-2"></i> Iniciar Inserción Masiva</>
+                  <>
+                    <i className="bi bi-play-circle-fill me-2"></i> Iniciar Inserción Masiva
+                  </>
                 )}
               </Button>
             </div>

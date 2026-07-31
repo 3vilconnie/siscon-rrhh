@@ -21,7 +21,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     async function obtenerDatosUsuario() {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
 
         if (error || !user) {
           if (montado) router.replace('/login');
@@ -34,15 +37,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
 
         if (montado) {
-          const nombre = user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'Usuario';
+          const nombre =
+            user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'Usuario';
           setNombreUsuario(nombre);
           setRolUsuario(user.user_metadata?.role || 'usuario');
 
           if (user.last_sign_in_at) {
             const fecha = new Date(user.last_sign_in_at);
-            setUltimaConexion(fecha.toLocaleString('es-CL', {
-              day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-            }));
+            setUltimaConexion(
+              fecha.toLocaleString('es-CL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+            );
           } else {
             setUltimaConexion('No registrada');
           }
@@ -55,15 +65,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
 
     obtenerDatosUsuario();
-    return () => { montado = false; };
+    return () => {
+      montado = false;
+    };
   }, [router]);
 
   const handleCerrarSesion = async (e: React.MouseEvent) => {
     e.preventDefault();
     try {
       await supabase.auth.signOut();
-      document.cookie = "sb-access-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      document.cookie = "sb-refresh-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = 'sb-access-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      document.cookie = 'sb-refresh-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
       window.location.href = '/login';
     } catch (err) {
       console.error('Error al procesar el cierre seguro de sesión:', err);
@@ -92,9 +104,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
 
         {/* ÁREA DE CONTENIDO */}
-        <div className="p-4 flex-grow-1 overflow-auto">
-          {children}
-        </div>
+        <div className="p-4 flex-grow-1 overflow-auto">{children}</div>
       </div>
     </GuardiánInactividad>
   );

@@ -25,7 +25,7 @@ export default function ActualizarPasswordPage() {
     // 1. Actualizamos la contraseña y removemos la bandera de fuerza
     const { error } = await supabase.auth.updateUser({
       password: nuevaPassword,
-      data: { force_password_change: false } // Quitamos la restricción
+      data: { force_password_change: false }, // Quitamos la restricción
     });
 
     setLoading(false);
@@ -44,18 +44,24 @@ export default function ActualizarPasswordPage() {
       <Toaster position="top-right" />
       <Card className="shadow-sm border-0 p-4" style={{ maxWidth: '400px', width: '100%' }}>
         <div className="text-center mb-4">
-          <div className="bg-warning text-dark rounded-circle d-inline-flex justify-content-center align-items-center mb-3" style={{ width: '60px', height: '60px' }}>
+          <div
+            className="bg-warning text-dark rounded-circle d-inline-flex justify-content-center align-items-center mb-3"
+            style={{ width: '60px', height: '60px' }}
+          >
             <i className="bi bi-shield-lock-fill fs-2"></i>
           </div>
           <h4 className="fw-bold text-dark m-0">Actualización Obligatoria</h4>
           <p className="text-muted small mt-2">
-            Por motivos de seguridad, debes cambiar la contraseña provisoria antes de acceder a la plataforma.
+            Por motivos de seguridad, debes cambiar la contraseña provisoria antes de acceder a la
+            plataforma.
           </p>
         </div>
 
         <Form onSubmit={handleUpdate}>
           <Form.Group className="mb-4">
-            <Form.Label className="small fw-bold text-secondary">Nueva Contraseña Segura</Form.Label>
+            <Form.Label className="small fw-bold text-secondary">
+              Nueva Contraseña Segura
+            </Form.Label>
             <Form.Control
               type="password"
               placeholder="••••••••"

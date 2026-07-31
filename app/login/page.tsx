@@ -9,7 +9,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   // Controles de estados nuevos
   const [vista, setVista] = useState<'login' | 'recuperar'>('login'); // Controla qué formulario se muestra
   const [errorMsg, setErrorMsg] = useState('');
@@ -51,7 +51,9 @@ export default function LoginPage() {
     if (error) {
       setErrorMsg(`Error: ${error.message}`);
     } else {
-      setSuccessMsg('📨 Enlace enviado. Revisa tu correo electrónico para restablecer tu contraseña.');
+      setSuccessMsg(
+        '📨 Enlace enviado. Revisa tu correo electrónico para restablecer tu contraseña.',
+      );
     }
   };
 
@@ -65,7 +67,6 @@ export default function LoginPage() {
   return (
     <div className="container d-flex align-items-center justify-content-center vh-100 bg-light">
       <Card className="shadow-sm border-0 p-4" style={{ maxWidth: '400px', width: '100%' }}>
-
         {/* Encabezado Común */}
         <div className="text-center mb-4">
           <h2 className="fw-bold text-primary m-0">
@@ -79,14 +80,16 @@ export default function LoginPage() {
         {/* Alertas de Error */}
         {errorMsg && (
           <Alert variant="danger" className="py-2 small text-center">
-            <i className="bi bi-exclamation-circle-fill me-2"></i>{errorMsg}
+            <i className="bi bi-exclamation-circle-fill me-2"></i>
+            {errorMsg}
           </Alert>
         )}
 
         {/* Alertas de Éxito (Para cuando se manda el email) */}
         {successMsg && (
           <Alert variant="success" className="py-2 small text-center">
-            <i className="bi bi-check-circle-fill me-2"></i>{successMsg}
+            <i className="bi bi-check-circle-fill me-2"></i>
+            {successMsg}
           </Alert>
         )}
 
@@ -94,7 +97,9 @@ export default function LoginPage() {
         {vista === 'login' ? (
           <Form onSubmit={handleLogin}>
             <Form.Group className="mb-3">
-              <Form.Label className="small fw-semibold text-secondary">Correo Electrónico</Form.Label>
+              <Form.Label className="small fw-semibold text-secondary">
+                Correo Electrónico
+              </Form.Label>
               <Form.Control
                 type="email"
                 placeholder="nombre@empresa.cl"
@@ -128,7 +133,12 @@ export default function LoginPage() {
               </Button>
             </div>
 
-            <Button type="submit" variant="primary" className="w-100 fw-semibold" disabled={loading}>
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-100 fw-semibold"
+              disabled={loading}
+            >
               {loading ? 'Autenticando...' : 'Iniciar Sesión'}
             </Button>
           </Form>
@@ -136,7 +146,9 @@ export default function LoginPage() {
           /* --- FORMULARIO VISTA: RECUPERAR CONTRASEÑA --- */
           <Form onSubmit={handleRecuperarPassword}>
             <Form.Group className="mb-4">
-              <Form.Label className="small fw-semibold text-secondary">Ingresa tu Correo Institucional</Form.Label>
+              <Form.Label className="small fw-semibold text-secondary">
+                Ingresa tu Correo Institucional
+              </Form.Label>
               <Form.Control
                 type="email"
                 placeholder="nombre@empresa.cl"
@@ -145,11 +157,17 @@ export default function LoginPage() {
                 required
               />
               <Form.Text className="text-muted" style={{ fontSize: '0.75rem' }}>
-                Te enviaremos un correo electrónico seguro con un enlace temporal para actualizar tus credenciales.
+                Te enviaremos un correo electrónico seguro con un enlace temporal para actualizar
+                tus credenciales.
               </Form.Text>
             </Form.Group>
 
-            <Button type="submit" variant="primary" className="w-100 fw-semibold mb-3" disabled={loading}>
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-100 fw-semibold mb-3"
+              disabled={loading}
+            >
               {loading ? 'Enviando...' : 'Enviar Enlace de Recuperación'}
             </Button>
 
@@ -167,7 +185,6 @@ export default function LoginPage() {
             </div>
           </Form>
         )}
-
       </Card>
     </div>
   );

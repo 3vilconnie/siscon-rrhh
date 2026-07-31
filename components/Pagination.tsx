@@ -8,7 +8,11 @@ interface PaginationProps {
   onPaginaChange: (pagina: number) => void;
 }
 
-export default function Pagination({ paginaActual, totalPaginas, onPaginaChange }: PaginationProps) {
+export default function Pagination({
+  paginaActual,
+  totalPaginas,
+  onPaginaChange,
+}: PaginationProps) {
   // Si solo hay una página o ninguna, no tiene sentido renderizar la barra
   if (totalPaginas <= 1) return null;
 
@@ -36,7 +40,6 @@ export default function Pagination({ paginaActual, totalPaginas, onPaginaChange 
     <div className="d-flex justify-content-center mb-4">
       <nav aria-label="Navegación de páginas">
         <BsPagination size="sm" className="shadow-sm m-0 align-items-center">
-
           {/* Botón Ir a la Primera Página */}
           <BsPagination.First
             title="Primera página"
@@ -69,7 +72,9 @@ export default function Pagination({ paginaActual, totalPaginas, onPaginaChange 
           ))}
 
           {/* Puntos suspensivos finales */}
-          {paginasVisibles[paginasVisibles.length - 1] < totalPaginas && <BsPagination.Ellipsis disabled />}
+          {paginasVisibles[paginasVisibles.length - 1] < totalPaginas && (
+            <BsPagination.Ellipsis disabled />
+          )}
 
           {/* Botón Siguiente */}
           <BsPagination.Next
@@ -87,7 +92,6 @@ export default function Pagination({ paginaActual, totalPaginas, onPaginaChange 
           >
             <i className="bi bi-chevron-double-right"></i>
           </BsPagination.Last>
-
         </BsPagination>
       </nav>
     </div>

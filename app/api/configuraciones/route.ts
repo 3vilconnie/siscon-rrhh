@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
 // GET: Obtener parámetros (Accesible por cualquier usuario logueado para calcular alertas)
@@ -31,14 +31,12 @@ export async function POST(request: Request) {
     const body = await request.json(); // Espera un objeto { ventana_meses, enfriamiento_meses, minimo_contratos }
 
     for (const [clave, valor] of Object.entries(body)) {
-      const { error } = await supabaseAdmin
-        .from('configuraciones')
-        .upsert({ 
-          clave, 
-          valor: Number(valor), 
-          updated_at: new Date().toISOString() 
-        });
-        
+      const { error } = await supabaseAdmin.from('configuraciones').upsert({
+        clave,
+        valor: Number(valor),
+        updated_at: new Date().toISOString(),
+      });
+
       if (error) throw error;
     }
 

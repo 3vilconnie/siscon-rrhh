@@ -3,7 +3,8 @@
 @import 'bootstrap-icons/font/bootstrap-icons.css';
 
 /* Ajustes personalizados para el layout de siscon RRHH */
-html, body {
+html,
+body {
   height: 100%;
   margin: 0;
   background-color: #f8f9fa;
@@ -34,5 +35,11 @@ html, body {
   flex-shrink: 0;
 }
 
-.hover-white:hover { color: #ffffff !important; }
-.transition-colors { transition: background-color 0.2s, color 0.2s; }
+.hover-white:hover {
+  color: #ffffff !important;
+}
+.transition-colors {
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}

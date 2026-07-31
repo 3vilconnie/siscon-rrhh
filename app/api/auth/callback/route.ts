@@ -6,7 +6,7 @@ import { cookies } from 'next/headers';
 export async function GET(req: Request) {
   const { searchParams, origin } = new URL(req.url);
   const code = searchParams.get('code');
-  
+
   // Si no hay parámetro "next", enviamos al usuario a la raíz por defecto
   const next = searchParams.get('next') || '/';
 
@@ -33,7 +33,7 @@ export async function GET(req: Request) {
             }
           },
         },
-      }
+      },
     );
 
     // 2. Intercambiamos el código de la URL por una sesión real
@@ -48,5 +48,7 @@ export async function GET(req: Request) {
   }
 
   // Si algo falla o no hay código en la URL, se devuelve al login con un error
-  return NextResponse.redirect(`${new URL(req.url).origin}/login?error=Enlace de recuperación inválido o expirado`);
+  return NextResponse.redirect(
+    `${new URL(req.url).origin}/login?error=Enlace de recuperación inválido o expirado`,
+  );
 }

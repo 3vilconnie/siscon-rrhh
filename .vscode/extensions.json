@@ -1,0 +1,29 @@
+{
+  // VS Code sugerirá instalar estas extensiones al abrir el proyecto.
+  // (Este archivo admite comentarios porque VS Code lo lee como JSONC.)
+  "recommendations": [
+    // --- Esenciales ---
+    "dbaeumer.vscode-eslint", // ESLint en vivo (ya usas eslint-config-next)
+    "esbenp.prettier-vscode", // Formateo automático al guardar
+    "bradlc.vscode-tailwindcss", // IntelliSense de Tailwind (tienes Tailwind 4)
+    "usernamehw.errorlens", // Muestra errores/warnings en la misma línea
+
+    // --- React / Next.js / TypeScript ---
+    "dsznajder.es7-react-js-snippets", // Snippets (rafce, etc.) para crear componentes
+    "yoavbls.pretty-ts-errors", // Hace legibles los errores largos de TypeScript
+    "formulahendry.auto-rename-tag", // Renombra la etiqueta de cierre automáticamente
+    "christian-kohler.npm-intellisense", // Autocompleta imports de paquetes
+    "christian-kohler.path-intellisense", // Autocompleta rutas de archivos (@/components/...)
+    "pflannery.vscode-versionlens", // Muestra versiones actuales/nuevas de dependencias
+
+    // --- Supabase / PostgreSQL ---
+    "supabase.vscode-supabase-extension", // Explorar tablas y correr SQL desde VS Code
+    "ms-ossdata.vscode-pgsql", // Conexión directa a PostgreSQL (queries, RLS)
+
+    // --- Productividad ---
+    "eamodio.gitlens", // Git blame inline e historial
+    "streetsidesoftware.code-spell-checker", // Detector de typos
+    "streetsidesoftware.code-spell-checker-spanish" // Diccionario ES (código mixto ES/EN)
+  ],
+  "unwantedRecommendations": []
+}

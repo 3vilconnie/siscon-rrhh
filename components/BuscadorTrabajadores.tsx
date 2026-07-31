@@ -49,7 +49,8 @@ export default function BuscadorTrabajadores({
 
         {busqueda && !estaFiltrando && (
           <Form.Text className="text-muted mt-2 small">
-            Mostrando <strong>{totalFiltrados}</strong> de <strong>{totalTotal}</strong> resultados encontrados.
+            Mostrando <strong>{totalFiltrados}</strong> de <strong>{totalTotal}</strong> resultados
+            encontrados.
           </Form.Text>
         )}
       </Card.Body>

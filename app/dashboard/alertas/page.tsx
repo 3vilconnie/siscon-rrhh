@@ -10,7 +10,8 @@ export default function ReporteAlertasPage() {
           Panel de Advertencias Contractuales
         </h2>
         <p className="text-muted small m-0">
-          Seguimiento consultivo de personal con 2 o más contratos en un marco de 15 meses y con relación laboral vigente.
+          Seguimiento consultivo de personal con 2 o más contratos en un marco de 15 meses y con
+          relación laboral vigente.
         </p>
       </div>
 

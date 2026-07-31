@@ -2,19 +2,20 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
-
 
 export async function GET() {
   try {
-    const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
-    
+    const {
+      data: { users },
+      error,
+    } = await supabaseAdmin.auth.admin.listUsers();
+
     if (error) throw error;
-    
+
     return NextResponse.json(users);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -23,27 +24,27 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { email, role } = await request.json();   
+    const { email, role } = await request.json();
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
 
     if (error) throw error;
 
     if (data.user) {
       await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
-        app_metadata: { role: role || 'usuario' }
+        app_metadata: { role: role || 'usuario' },
       });
     }
 
     // Registrar en Auditoría
     await supabaseAdmin.from('auditoria').insert({
-      actor: 'Administrador', 
+      actor: 'Administrador',
       accion: 'INVITAR_USUARIO',
-      detalles: `Se envió invitación de acceso al correo: ${email} con rol ${role}`
+      detalles: `Se envió invitación de acceso al correo: ${email} con rol ${role}`,
     });
 
-    return NextResponse.json({ 
-      message: 'Invitación enviada exitosamente', 
-      user: data.user
+    return NextResponse.json({
+      message: 'Invitación enviada exitosamente',
+      user: data.user,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -80,7 +81,7 @@ export async function PATCH(request: Request) {
     await supabaseAdmin.from('auditoria').insert({
       actor: 'Administrador',
       accion: accion ? accion.toUpperCase() : 'MODIFICAR_USUARIO',
-      detalles: detalleAccion
+      detalles: detalleAccion,
     });
 
     return NextResponse.json({ message: 'Actualizado exitosamente', user: data.user });
@@ -101,7 +102,7 @@ export async function DELETE(request: Request) {
     await supabaseAdmin.from('auditoria').insert({
       actor: 'Administrador',
       accion: 'ELIMINAR_USUARIO',
-      detalles: `Se eliminó definitivamente el usuario con ID: ${id}`
+      detalles: `Se eliminó definitivamente el usuario con ID: ${id}`,
     });
 
     return NextResponse.json({ message: 'Usuario eliminado' });

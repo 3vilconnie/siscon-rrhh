@@ -9,21 +9,22 @@ interface MensajeChat {
 
 export default function AiChatSidebar() {
   const [minimizado, setMinimizado] = useState(false);
-  const [expandido, setExpanded] = useState(false); 
-  const [isTyping, setIsTyping] = useState(false); 
+  const [expandido, setExpanded] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [input, setInput] = useState('');
   const [mensajes, setMensajes] = useState<MensajeChat[]>([
-    { 
-      rol: 'assistant', 
-      texto: '¡Hola! Soy el asistente analítico de siscon RRHH. Puedo ayudarte a auditar las fichas de personal, revisar sueldos y consultar el historial acumulado en Supabase.' 
-    }
+    {
+      rol: 'assistant',
+      texto:
+        '¡Hola! Soy el asistente analítico de siscon RRHH. Puedo ayudarte a auditar las fichas de personal, revisar sueldos y consultar el historial acumulado en Supabase.',
+    },
   ]);
 
   // UX: Burbujas inteligentes de un solo clic con consultas comunes de ejemplo
   const sugerenciasIniciales = [
     { titulo: '📄 Contratos de Julia', query: 'cuantos contratos tiene julia alcon' },
     { titulo: '🔍 Datos de Julia', query: 'datos de julia alcon' },
-    { titulo: '⚠️ Ver panel de alertas', query: '¿Qué alertas de continuidad hay vigentes?' }
+    { titulo: '⚠️ Ver panel de alertas', query: '¿Qué alertas de continuidad hay vigentes?' },
   ];
 
   const finMensajesRef = useRef<HTMLDivElement>(null);
@@ -40,7 +41,7 @@ export default function AiChatSidebar() {
     const nuevoMensajeUsuario: MensajeChat = { rol: 'user', texto: textoEnviar };
     setMensajes((prev) => [...prev, nuevoMensajeUsuario]);
     setInput('');
-    setIsTyping(true); 
+    setIsTyping(true);
 
     try {
       const response = await fetch('/api/chat', {
@@ -52,12 +53,15 @@ export default function AiChatSidebar() {
       const data = await response.json();
       setMensajes((prev) => [...prev, { rol: 'assistant', texto: data.respuesta }]);
     } catch (err) {
-      setMensajes((prev) => [...prev, { 
-        rol: 'assistant', 
-        texto: 'Lo siento, ocurrió un error de conexión al consultar la base de datos analítica.' 
-      }]);
+      setMensajes((prev) => [
+        ...prev,
+        {
+          rol: 'assistant',
+          texto: 'Lo siento, ocurrió un error de conexión al consultar la base de datos analítica.',
+        },
+      ]);
     } finally {
-      setIsTyping(false); 
+      setIsTyping(false);
     }
   };
 
@@ -93,7 +97,7 @@ export default function AiChatSidebar() {
         }
       `}</style>
 
-      <div 
+      <div
         className="position-fixed shadow-lg border rounded-top bg-white"
         style={{
           bottom: 0,
@@ -101,11 +105,11 @@ export default function AiChatSidebar() {
           width: chatWidth,
           zIndex: 1050,
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          transform: minimizado ? 'translateY(calc(100% - 45px))' : 'translateY(0)'
+          transform: minimizado ? 'translateY(calc(100% - 45px))' : 'translateY(0)',
         }}
       >
         {/* BARRA DE TÍTULO */}
-        <div 
+        <div
           className="card-header bg-dark text-white d-flex justify-content-between align-items-center px-3 py-2 cursor-pointer"
           style={{ height: '45px', userSelect: 'none' }}
           onClick={(e) => {
@@ -114,24 +118,29 @@ export default function AiChatSidebar() {
           }}
         >
           <div className="d-flex align-items-center gap-2 small fw-bold text-uppercase tracking-wider">
-            <span className="position-relative d-inline-block" style={{ width: '8px', height: '8px' }}>
+            <span
+              className="position-relative d-inline-block"
+              style={{ width: '8px', height: '8px' }}
+            >
               <span className="position-absolute top-0 start-0 w-100 h-100 bg-success rounded-circle animate-ping"></span>
               <span className="position-absolute top-0 start-0 w-100 h-100 bg-success rounded-circle"></span>
             </span>
             <i className="bi bi-robot me-1"></i> Asistente IA
           </div>
-          
+
           <div className="d-flex gap-1">
             {!minimizado && (
-              <button 
-                className="btn btn-sm text-white-50 p-1 border-0 hover-white" 
+              <button
+                className="btn btn-sm text-white-50 p-1 border-0 hover-white"
                 onClick={() => setExpanded(!expandido)}
-                title={expandido ? "Reducir ancho" : "Expandir ancho"}
+                title={expandido ? 'Reducir ancho' : 'Expandir ancho'}
               >
-                <i className={`bi ${expandido ? 'bi-arrows-angle-contract' : 'bi-arrows-angle-expand'}`}></i>
+                <i
+                  className={`bi ${expandido ? 'bi-arrows-angle-contract' : 'bi-arrows-angle-expand'}`}
+                ></i>
               </button>
             )}
-            <button 
+            <button
               className="btn btn-sm text-white p-1 border-0"
               onClick={() => setMinimizado(!minimizado)}
             >
@@ -141,22 +150,24 @@ export default function AiChatSidebar() {
         </div>
 
         {/* CUERPO DEL CHAT */}
-        <div className="d-flex flex-column" style={{ height: expandido ? '500px' : '400px', transition: 'height 0.3s' }}>
-          
+        <div
+          className="d-flex flex-column"
+          style={{ height: expandido ? '500px' : '400px', transition: 'height 0.3s' }}
+        >
           <div className="p-3 flex-grow-1 overflow-auto bg-light small" style={{ height: '100%' }}>
             {mensajes.map((msg, idx) => (
-              <div 
-                key={idx} 
+              <div
+                key={idx}
                 className={`d-flex mb-3 ${msg.rol === 'user' ? 'justify-content-end' : 'justify-content-start'}`}
               >
-                <div 
-                  className="p-2 px-3 shadow-sm" 
-                  style={{ 
+                <div
+                  className="p-2 px-3 shadow-sm"
+                  style={{
                     maxWidth: '85%',
                     backgroundColor: msg.rol === 'user' ? '#0d6efd' : '#ffffff',
                     color: msg.rol === 'user' ? '#ffffff' : '#212529',
                     borderRadius: msg.rol === 'user' ? '12px 12px 0 12px' : '12px 12px 12px 0',
-                    whiteSpace: 'pre-line'
+                    whiteSpace: 'pre-line',
                   }}
                 >
                   {(() => {
@@ -175,7 +186,12 @@ export default function AiChatSidebar() {
             {/* UX: MOSTRAR BURBUJAS DE SUGERENCIAS SOLO SI ESTÁ EL MENSAJE INICIAL */}
             {mensajes.length === 1 && !isTyping && (
               <div className="mt-3 animate__animated animate__fadeIn">
-                <span className="text-muted d-block mb-2 font-monospace" style={{ fontSize: '10px' }}>💡 CONSULTAS RÁPIDAS SUGERIDAS:</span>
+                <span
+                  className="text-muted d-block mb-2 font-monospace"
+                  style={{ fontSize: '10px' }}
+                >
+                  💡 CONSULTAS RÁPIDAS SUGERIDAS:
+                </span>
                 <div className="d-flex flex-column gap-2">
                   {sugerenciasIniciales.map((sug, i) => (
                     <Button
@@ -198,12 +214,18 @@ export default function AiChatSidebar() {
             {/* Animación de "Escribiendo..." */}
             {isTyping && (
               <div className="d-flex justify-content-start mb-3">
-                <div 
-                  className="p-2 px-3 shadow-sm d-flex align-items-center" 
-                  style={{ backgroundColor: '#ffffff', borderRadius: '12px 12px 12px 0', height: '38px' }}
+                <div
+                  className="p-2 px-3 shadow-sm d-flex align-items-center"
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '12px 12px 12px 0',
+                    height: '38px',
+                  }}
                 >
                   <div className="typing-indicator d-flex align-items-center">
-                    <span></span><span></span><span></span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
                   </div>
                 </div>
               </div>
@@ -213,12 +235,17 @@ export default function AiChatSidebar() {
           </div>
 
           {/* Input de Texto Inferior */}
-          <Form onSubmit={handleEnviar} className="p-2 border-top bg-white d-flex gap-2 align-items-center">
+          <Form
+            onSubmit={handleEnviar}
+            className="p-2 border-top bg-white d-flex gap-2 align-items-center"
+          >
             <Form.Control
               type="text"
               size="sm"
               className="border-0 bg-light"
-              placeholder={isTyping ? "Esperando respuesta..." : "Ej: ¿Cuántos contratos tiene Carmen Zuñiga?"}
+              placeholder={
+                isTyping ? 'Esperando respuesta...' : 'Ej: ¿Cuántos contratos tiene Carmen Zuñiga?'
+              }
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={isTyping}
@@ -235,7 +262,6 @@ export default function AiChatSidebar() {
               <i className="bi bi-send-fill" style={{ marginLeft: '-2px' }}></i>
             </Button>
           </Form>
-
         </div>
       </div>
     </>
