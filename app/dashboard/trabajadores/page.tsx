@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { Card, Table, Badge, Button, Form, InputGroup, Spinner } from 'react-bootstrap';
 import Pagination from '@/components/Pagination';
+import { useDebounce } from '@/lib/hooks/useDebounce';
 import { Trabajador } from '@/types';
 
 type SortKey = 'rut' | 'nombre' | 'num_contratos';
@@ -13,8 +14,8 @@ type FiltroContrato = 'todos' | 'unico' | 'alerta' | 'critico';
 export default function NominatrabajadoresPage() {
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [busqueda, setBusqueda] = useState('');
-  const [busquedaDebounced, setBusquedaDebounced] = useState(''); // <-- UX: Debounce
-  const [estaFiltrando, setEstaFiltrando] = useState(false); // <-- UX: Spinner de búsqueda
+  const busquedaDebounced = useDebounce(busqueda, 300); // UX: espera 300ms tras la última tecla
+  const estaFiltrando = busqueda !== busquedaDebounced; // true mientras el debounce "alcanza"
   const [loading, setLoading] = useState(true);
 
   // --- NUEVO ESTADO DE FILTRADO RÁPIDO (PILLS) ---
@@ -27,22 +28,6 @@ export default function NominatrabajadoresPage() {
 
   const [paginaActual, setPaginaActual] = useState(1);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
-
-  // Efecto para simular el debounce de la búsqueda (UX fluida)
-  useEffect(() => {
-    if (!busqueda) {
-      setBusquedaDebounced('');
-      setEstaFiltrando(false);
-      return;
-    }
-    setEstaFiltrando(true);
-    const handler = setTimeout(() => {
-      setBusquedaDebounced(busqueda);
-      setEstaFiltrando(false);
-    }, 300); // 300ms de espera antes de aplicar el filtro pesado
-
-    return () => clearTimeout(handler);
-  }, [busqueda]);
 
   useEffect(() => {
     async function cargarTrabajadores() {
