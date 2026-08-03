@@ -112,6 +112,7 @@ export default function NavbarSuperior({
   const enlaces = [
     { href: '/dashboard/trabajadores', icon: 'bi-people', label: 'Trabajadores' },
     { href: '/dashboard/recepcion', icon: 'bi-book', label: 'Recepción' },
+    { href: '/dashboard/documentos', icon: 'bi-file-earmark-word', label: 'Documentos' },
     { href: '/dashboard/formulario', icon: 'bi-person-plus', label: 'Registrar' },
     { href: '/dashboard/carga-masiva', icon: 'bi-cloud-arrow-up', label: 'Carga Masiva' },
     { href: '/dashboard/horas-compensatorias', icon: 'bi-clock-history', label: 'Horas Comp.' },
