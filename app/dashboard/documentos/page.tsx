@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { Card, Row, Col, Form, Button, Spinner, Badge, ListGroup, Table } from 'react-bootstrap';
@@ -170,15 +171,20 @@ export default function ModuloGeneracionDocumentos() {
 
   return (
     <div className="container-fluid" style={{ maxWidth: '1100px' }}>
-      <div className="mb-4">
-        <h3 className="fw-bold text-dark mb-1">
-          <i className="bi bi-file-earmark-word text-primary me-2"></i>
-          Generación de Documentos
-        </h3>
-        <p className="text-muted small m-0">
-          Combina una plantilla Word con los datos del trabajador (estilo combinación de
-          correspondencia) y descárgala en PDF o Word.
-        </p>
+      <div className="mb-4 d-flex justify-content-between align-items-start gap-3">
+        <div>
+          <h3 className="fw-bold text-dark mb-1">
+            <i className="bi bi-file-earmark-word text-primary me-2"></i>
+            Generación de Documentos
+          </h3>
+          <p className="text-muted small m-0">
+            Combina una plantilla Word con los datos del trabajador (estilo combinación de
+            correspondencia) y descárgala en PDF o Word.
+          </p>
+        </div>
+        <Link href="/dashboard/documentos/masivo" className="btn btn-outline-primary flex-shrink-0">
+          <i className="bi bi-people-fill me-1"></i> Notificación masiva
+        </Link>
       </div>
 
       <Row className="g-4">

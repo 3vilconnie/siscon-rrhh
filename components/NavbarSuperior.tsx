@@ -270,7 +270,7 @@ export default function NavbarSuperior({
                 </div>
                 <span
                   className="fw-semibold small text-dark d-none d-sm-inline text-truncate"
-                  style={{ maxWidth: '160px' }}
+                  style={{ maxWidth: '240px' }}
                 >
                   {nombreUsuario}
                 </span>
