@@ -182,9 +182,14 @@ export default function ModuloGeneracionDocumentos() {
             correspondencia) y descárgala en PDF o Word.
           </p>
         </div>
-        <Link href="/dashboard/documentos/masivo" className="btn btn-outline-primary flex-shrink-0">
-          <i className="bi bi-people-fill me-1"></i> Notificación masiva
-        </Link>
+        <div className="d-flex gap-2 flex-shrink-0">
+          <Link href="/dashboard/finiquito" className="btn btn-outline-success">
+            <i className="bi bi-cash-coin me-1"></i> Cálculo finiquito
+          </Link>
+          <Link href="/dashboard/documentos/masivo" className="btn btn-outline-primary">
+            <i className="bi bi-people-fill me-1"></i> Notificación masiva
+          </Link>
+        </div>
       </div>
 
       <Row className="g-4">

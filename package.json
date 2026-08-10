@@ -16,15 +16,14 @@
     "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.1",
     "carbone": "^3.8.2",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^4.2.1",
     "next": "16.2.9",
     "pizzip": "^3.2.0",
     "react": "19.2.4",
     "react-bootstrap": "^2.10.10",
     "react-dom": "19.2.4",
     "react-hot-toast": "^2.6.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

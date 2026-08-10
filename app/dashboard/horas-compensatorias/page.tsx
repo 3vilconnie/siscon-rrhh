@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { registrarAuditoria, ACCIONES } from '@/lib/auditoria';
+import { construirDatosHoras } from '@/lib/horasCompensatorias';
 import toast from 'react-hot-toast';
 import {
   Card,
@@ -57,6 +59,7 @@ export default function HorasCompensatoriasPage() {
     useState<ResumenHorasFuncionario | null>(null);
   const [detallesHistorial, setDetallesHistorial] = useState<DetalleConsumo[]>([]);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
+  const [generandoDoc, setGenerandoDoc] = useState<'pdf' | 'docx' | null>(null);
 
   // Declarada antes de los efectos porque el efecto de búsqueda la usa.
   // useCallback([]) mantiene una referencia estable (solo llama setters).
@@ -231,6 +234,10 @@ export default function HorasCompensatoriasPage() {
         }
         return;
       }
+      await registrarAuditoria(
+        ACCIONES.REGISTRAR_HORAS,
+        `RUT ${rutClean}: ${horasNum} h el ${fechaInput}`,
+      );
       toast.success('Horas compensatorias descontadas exitosamente.', { id: toastId });
 
       reiniciarFormularioCompleto();
@@ -265,6 +272,58 @@ export default function HorasCompensatoriasPage() {
       toast.error(`No se pudo cargar el desglose detallado ${err}.`);
     } finally {
       setLoadingDetalle(false);
+    }
+  };
+
+  // --- GENERAR DOCUMENTO (PDF / Word) DEL DETALLE DE PERMISOS ---
+  const generarDetalle = async (formato: 'pdf' | 'docx') => {
+    if (!funcionarioSeleccionado) return;
+    if (detallesHistorial.length === 0)
+      return toast.error('No hay permisos registrados para detallar.');
+
+    const datos = construirDatosHoras({
+      nombreCompleto: funcionarioSeleccionado.nombreCompleto,
+      rut: funcionarioSeleccionado.rut,
+      dv: funcionarioSeleccionado.dv,
+      ano: anoSeleccionado,
+      tope: TOPE_ANUAL,
+      consumidas: funcionarioSeleccionado.horasConsumidasAnuales,
+      disponibles: funcionarioSeleccionado.horasDisponiblesAnuales,
+      detalles: detallesHistorial.map((d) => ({
+        fecha: d.fecha,
+        horas_solicitadas: d.horas_solicitadas,
+      })),
+    });
+
+    setGenerandoDoc(formato);
+    const toastId = toast.loading(`Generando ${formato.toUpperCase()}...`);
+    try {
+      const res = await fetch('/api/horas/generar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formato, datos }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Error desconocido.' }));
+        throw new Error(error);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `horas_compensatorias_${funcionarioSeleccionado.rut}.${formato}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Documento ${formato.toUpperCase()} generado.`, { id: toastId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al generar el documento.', {
+        id: toastId,
+        duration: 6000,
+      });
+    } finally {
+      setGenerandoDoc(null);
     }
   };
 
@@ -641,7 +700,29 @@ export default function HorasCompensatoriasPage() {
             </Table>
           </div>
         </Modal.Body>
-        <Modal.Footer className="border-0 bg-light py-2">
+        <Modal.Footer className="border-0 bg-light py-2 d-flex justify-content-between">
+          <div className="d-flex gap-2">
+            <Button
+              type="button"
+              variant="outline-success"
+              size="sm"
+              disabled={loadingDetalle || detallesHistorial.length === 0 || generandoDoc !== null}
+              onClick={() => generarDetalle('docx')}
+            >
+              <i className="bi bi-file-earmark-word me-1"></i>
+              {generandoDoc === 'docx' ? 'Generando...' : 'Word'}
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              disabled={loadingDetalle || detallesHistorial.length === 0 || generandoDoc !== null}
+              onClick={() => generarDetalle('pdf')}
+            >
+              <i className="bi bi-file-earmark-pdf me-1"></i>
+              {generandoDoc === 'pdf' ? 'Generando...' : 'Descargar PDF'}
+            </Button>
+          </div>
           <Button
             type="button"
             variant="secondary"

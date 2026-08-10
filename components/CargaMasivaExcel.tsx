@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { registrarAuditoria, ACCIONES } from '@/lib/auditoria';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
 import { Card, Button, Spinner } from 'react-bootstrap';
@@ -101,6 +102,7 @@ export default function CargaMasivaExcel() {
         throw new Error('La planilla no posee filas de datos válidas desde la línea 8.');
       }
 
+      let procesados = 0;
       for (const fila of filas) {
         const [rut, dv, primerAp, segundoAp, nombres, jornada, sueldo, fechaIni, fechaTerm] = fila;
         if (!rut || isNaN(Number(rut))) continue;
@@ -124,6 +126,14 @@ export default function CargaMasivaExcel() {
           fecha_termino: fechaTerm ? formatearFechaExcel(fechaTerm) : null,
         });
         if (errC) throw errC;
+        procesados++;
+      }
+
+      if (procesados > 0) {
+        await registrarAuditoria(
+          ACCIONES.CARGA_MASIVA,
+          `Archivo "${item.nombre}": ${procesados} contrato(s) cargado(s).`,
+        );
       }
       return true;
     } catch (err: any) {

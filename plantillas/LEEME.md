@@ -55,6 +55,73 @@ usando [Carbone](https://carbone.io) y convierte a PDF.
 | `{d.notificacion.causal}` | Texto de la causal (desde el catálogo `CAUSALES` en `lib/plantillas.ts`) |
 | `{d.notificacion.redactor_iniciales}` | Iniciales del redactor (minúscula) |
 
+### Solo en el Finiquito (`finiquito.docx`)
+
+Esta plantilla usa su propio conjunto de datos (ver `lib/finiquito.ts`), no `DatosDocumento`.
+El módulo **Finiquito** (`/dashboard/finiquito`) calcula el feriado proporcional y rellena estos
+marcadores:
+
+| Marcador | Reemplaza por |
+|---|---|
+| `{d.programa.proyecto}` | Párrafo del proyecto/convenio (cabecera, según el programa) |
+| `{d.trabajador.nombre_completo_upper}` | Nombre del trabajador en mayúsculas |
+| `{d.trabajador.tratamiento_cap}` | "Don" / "Doña" |
+| `{d.trabajador.del_dela}` / `{d.trabajador.genero_a}` | "DEL"/"DE LA" y sufijo "A" para el título |
+| `{d.trabajador.rut_miles}` - `{d.trabajador.dv}` | RUT y dígito verificador |
+| `{d.contrato.fecha_inicio:formatD(LL)}` / `{d.contrato.fecha_termino:formatD(LL)}` | Período |
+| `{d.finiquito.terminos}` / `{d.finiquito.articulo}` | Causal de término y artículo |
+| `{d.finiquito.fp_texto}` | Días de feriado proporcional (ej. "5,42") |
+| `{d.finiquito.total_texto}` | Monto a pagar con puntos de miles (ej. "108.400") |
+| `{d.finiquito.total_palabras}` | Monto en palabras (ej. "CIENTO OCHO MIL ... PESOS") |
+| `{d.firmante.nombre}` / `{d.firmante.nombre_corto}` / `{d.firmante.cargo}` / `{d.firmante.rut}` | Firmante |
+
+> `finiquito.docx` se generó por código (a partir del esqueleto de `notificacion-fin-contrato.docx`)
+> para garantizar que cada marcador quede en un único *run*. Puedes abrirlo y editarlo en Word;
+> respeta los marcadores `{d....}` sin partirlos entre distintos formatos.
+
+### Solo en la Recepción de Documentos (`recepcion-documentos.docx`)
+
+El módulo **Recepción** (`/dashboard/recepcion`) usa su propio conjunto de datos
+(ver `lib/recepcion.ts`). La tabla de detalle **se repite** por cada documento recibido
+usando la sintaxis de lista de Carbone `{d.detalles[i].campo}` (con una fila «límite»
+`{d.detalles[i+1].campo}` que Carbone consume al renderizar):
+
+| Marcador | Reemplaza por |
+|---|---|
+| `{d.documento.tipos}` | Tipos de documento seleccionados |
+| `{d.documento.fecha_recepcion:formatD(LL)}` | Fecha de recepción en texto |
+| `{d.documento.descripcion}` | Cantidad / descripción general |
+| `{d.detalles[i].fecha_emision}` | Fecha de emisión de cada fila (ya en DD-MM-YYYY) |
+| `{d.detalles[i].programa}` | Programa de cada fila |
+| `{d.detalles[i].rut}` / `{d.detalles[i].dv}` | RUT y dígito verificador |
+| `{d.detalles[i].nombre}` / `{d.detalles[i].apellido_p}` / `{d.detalles[i].apellido_m}` | Nombre y apellidos |
+| `{d.detalles[i].genero}` | Género (M/F/S/R) |
+| `{d.entrega}` / `{d.recibe}` | Quien entrega / quien recibe |
+
+> Se generó por código con `node scripts/build-recepcion-docx.cjs` (usa el logo de
+> `public/logoconaf.png`). Para repetir filas en una tabla, Carbone necesita **dos** filas
+> en la plantilla: la de datos con `[i]` y una de límite con `[i+1]`.
+
+### Solo en el Contrato de Trabajo (`contrato-trabajo.docx`)
+
+El módulo **Contratos** (`/dashboard/contratos`) usa su propio conjunto de datos
+(ver `lib/contrato.ts`). Muchos campos personales no están en la base y se completan
+en el formulario. Los textos que dependen del género (el/la, trabajador/a) se resuelven
+en el código y llegan como `{d.g.*}`. La cláusula de bonos (NOVENO) es **condicional**:
+se muestra solo si hay bonos, usando los formateadores `:ifEQ(true):showBegin` … `:showEnd`
+de Carbone sobre `{d.bonos.mostrar}`.
+
+| Marcador | Reemplaza por |
+|---|---|
+| `{d.programa.proyecto}` / `{d.programa.subtitulo}` / `{d.programa.nombre}` | Proyecto, subtítulo y nombre del programa |
+| `{d.trabajador.*}` | trato, nombre/apellidos, RUT/DV, nacionalidad, estado_civil, lugar_nac, fecha_nac, domicilio, comuna |
+| `{d.g.*}` | Textos por género: el_la, El_La, el_trabajador, El_trabajador, del_trabajador, al_trabajador |
+| `{d.contrato.*}` | inicio, termino, labores, lugar_trabajo, dependencia_dir, sueldo_texto, sueldo_palabras, prevision, salud |
+| `{d.bonos.*}` | mostrar, numeral_ejemplares, mov_texto/mov_palabras, col_texto/col_palabras |
+| `{d.director.*}` / `{d.institucion.*}` | Firmante (director) e institución |
+
+> Se generó con `node scripts/build-contrato-docx.cjs` (usa el logo de `public/logoconaf.png`).
+
 ## Formateadores útiles de Carbone
 
 - Fechas localizadas: `:formatD(LL)` → "30 de abril de 2026" (usa `lang: 'es-cl'`).

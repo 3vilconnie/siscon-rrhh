@@ -20,6 +20,8 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
+    // Scripts de build de plantillas (Node CJS, no forman parte de la app).
+    'scripts/**',
   ]),
 ]);
 

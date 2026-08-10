@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { registrarAuditoria, ACCIONES } from '@/lib/auditoria';
 import { toast } from 'react-hot-toast';
 import { Card, Form, Row, Col, InputGroup, Button, Spinner, Alert } from 'react-bootstrap';
 
@@ -157,6 +158,11 @@ export default function FormularioTrabajador() {
           segundo_apellido: segundoApellido ? segundoApellido.toUpperCase().trim() : null,
         });
         if (errTrabajador) throw errTrabajador;
+
+        await registrarAuditoria(
+          ACCIONES.CREAR_TRABAJADOR,
+          `RUT ${cuerpoRut}-${dv.toUpperCase()}: ${nombres.trim()} ${primerApellido.trim()} ${segundoApellido.trim()}`.trim(),
+        );
       }
 
       // 3. Insertar los términos del Contrato
@@ -169,6 +175,11 @@ export default function FormularioTrabajador() {
       });
 
       if (errContrato) throw errContrato;
+
+      await registrarAuditoria(
+        ACCIONES.CREAR_CONTRATO,
+        `RUT ${cuerpoRut}: ${fechaInicio} → ${fechaTermino || 'Indefinido'}, jornada ${jornada}h, sueldo $${sueldoBase}`,
+      );
 
       toast.success('¡Ficha contractual guardada exitosamente!', { id: toastId });
       handleLimpiarFormulario();

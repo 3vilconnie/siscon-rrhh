@@ -6,6 +6,21 @@ export interface Contrato {
   sueldo_base?: number;
   fecha_inicio: string;
   fecha_termino: string | null;
+  // Datos de la plantilla de contrato (opcionales; se llenan al generar/guardar).
+  nacionalidad?: string | null;
+  estado_civil?: string | null;
+  lugar_nac?: string | null;
+  fecha_nac?: string | null;
+  domicilio?: string | null;
+  comuna?: string | null;
+  labores?: string | null;
+  lugar_trabajo?: string | null;
+  dependencia_dir?: string | null;
+  programa?: string | null;
+  prevision?: string | null;
+  salud?: string | null;
+  bono_movilizacion?: number | null;
+  bono_colacion?: number | null;
   // Propiedad que a veces devuelve Supabase al hacer count
   count?: number;
 }

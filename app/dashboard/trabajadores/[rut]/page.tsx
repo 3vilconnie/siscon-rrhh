@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { registrarAuditoria, ACCIONES } from '@/lib/auditoria';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -118,6 +119,10 @@ export default function DetalleTrabajadorPage() {
     if (error) {
       toast.error('Error al actualizar: ' + error.message, { id: toastId });
     } else {
+      await registrarAuditoria(
+        ACCIONES.EDITAR_CONTRATO,
+        `Contrato ${contratoAEditar.id} (RUT ${params.rut}): ${editInicio} → ${editTermino || 'Indefinido'}, jornada ${editJornada}h, sueldo $${editSueldo}`,
+      );
       toast.success('Contrato actualizado exitosamente', { id: toastId });
       setModalAbierto(false);
       await obtenerDetalle();
@@ -127,8 +132,8 @@ export default function DetalleTrabajadorPage() {
   // Función auxiliar para calcular la brecha de enfriamiento
   const calcularBrecha = (finPrevio: string | null, inicioActual: string) => {
     if (!finPrevio) return null;
-    const d1 = new Date(finPrevio);
-    const d2 = new Date(inicioActual);
+    const d1 = new Date(finPrevio + 'T00:00:00');
+    const d2 = new Date(inicioActual + 'T00:00:00');
     if (d2 <= d1) return null;
 
     const diffTime = Math.abs(d2.getTime() - d1.getTime());
@@ -249,12 +254,12 @@ export default function DetalleTrabajadorPage() {
                             PERÍODO
                           </span>
                           <span className="fw-semibold">
-                            {new Date(c.fecha_inicio).toLocaleDateString('es-CL')}
+                            {new Date(c.fecha_inicio + 'T00:00:00').toLocaleDateString('es-CL')}
                           </span>{' '}
                           a{' '}
                           <span className="fw-semibold">
                             {c.fecha_termino
-                              ? new Date(c.fecha_termino).toLocaleDateString('es-CL')
+                              ? new Date(c.fecha_termino + 'T00:00:00').toLocaleDateString('es-CL')
                               : 'Indefinido'}
                           </span>
                         </Col>

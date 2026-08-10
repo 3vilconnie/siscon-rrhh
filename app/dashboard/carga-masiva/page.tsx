@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { registrarAuditoria, ACCIONES } from '@/lib/auditoria';
 import * as XLSX from 'xlsx';
 import { Card, Form, Button, ProgressBar, ListGroup, Badge } from 'react-bootstrap';
 
@@ -164,6 +165,10 @@ export default function CargaMasivaMultiPage() {
           }
 
           if (insertados > 0) {
+            await registrarAuditoria(
+              ACCIONES.CARGA_MASIVA,
+              `Archivo "${file.name}": ${insertados} contrato(s) cargado(s)${erroresFila > 0 ? `, ${erroresFila} rechazado(s)` : ''}.`,
+            );
             if (erroresFila > 0) {
               resolve({
                 archivo: file.name,

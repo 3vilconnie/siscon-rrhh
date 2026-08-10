@@ -1,11 +1,31 @@
 // app/api/admin/usuarios/route.ts
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
+
+/** Email del administrador autenticado (para la auditoría). */
+async function obtenerActor(): Promise<string> {
+  try {
+    const cookieStore = await cookies();
+    const supa = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } },
+    );
+    const {
+      data: { user },
+    } = await supa.auth.getUser();
+    return user?.email ?? 'Administrador';
+  } catch {
+    return 'Administrador';
+  }
+}
 
 export async function GET() {
   try {
@@ -37,7 +57,7 @@ export async function POST(request: Request) {
 
     // Registrar en Auditoría
     await supabaseAdmin.from('auditoria').insert({
-      actor: 'Administrador',
+      actor: await obtenerActor(),
       accion: 'INVITAR_USUARIO',
       detalles: `Se envió invitación de acceso al correo: ${email} con rol ${role}`,
     });
@@ -79,7 +99,7 @@ export async function PATCH(request: Request) {
 
     // 🔴 NUEVO: Registrar en Auditoría
     await supabaseAdmin.from('auditoria').insert({
-      actor: 'Administrador',
+      actor: await obtenerActor(),
       accion: accion ? accion.toUpperCase() : 'MODIFICAR_USUARIO',
       detalles: detalleAccion,
     });
@@ -100,7 +120,7 @@ export async function DELETE(request: Request) {
     if (error) throw error;
 
     await supabaseAdmin.from('auditoria').insert({
-      actor: 'Administrador',
+      actor: await obtenerActor(),
       accion: 'ELIMINAR_USUARIO',
       detalles: `Se eliminó definitivamente el usuario con ID: ${id}`,
     });

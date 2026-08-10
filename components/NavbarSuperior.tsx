@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Navbar, Nav, Button, Badge, Card, Dropdown, Container } from 'react-bootstrap';
+import { Navbar, Nav, NavDropdown, Button, Badge, Card, Dropdown, Container } from 'react-bootstrap';
 import { Trabajador, AlertaNotificacion } from '@/types';
 import { evaluarAlertaContinuidad } from '@/lib/utils/calculoAlertas';
 
@@ -12,6 +12,58 @@ interface NavbarSuperiorProps {
   ultimaConexion: string;
   rolUsuario: string;
   onCerrarSesion: (e: React.MouseEvent) => void;
+}
+
+interface EnlaceNav {
+  href: string;
+  icon: string;
+  label: string;
+}
+
+/** Menú desplegable de la barra que se abre al pasar el cursor (hover). */
+function NavHoverDropdown({
+  id,
+  icon,
+  label,
+  items,
+  checkIsActive,
+}: {
+  id: string;
+  icon: string;
+  label: string;
+  items: EnlaceNav[];
+  checkIsActive: (path: string) => boolean;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const activo = items.some((e) => checkIsActive(e.href));
+  return (
+    <div onMouseEnter={() => setAbierto(true)} onMouseLeave={() => setAbierto(false)}>
+      <NavDropdown
+        show={abierto}
+        onToggle={(next) => setAbierto(next)}
+        id={id}
+        title={
+          <span className="d-inline-flex align-items-center gap-2">
+            <i className={`bi ${icon}`}></i> {label}
+          </span>
+        }
+        className={`px-2 rounded ${activo ? 'fw-bold text-primary bg-primary bg-opacity-10' : 'text-secondary'}`}
+      >
+        {items.map((e) => (
+          <NavDropdown.Item
+            key={e.href}
+            as={Link}
+            href={e.href}
+            active={checkIsActive(e.href)}
+            className="d-flex align-items-center gap-2"
+            onClick={() => setAbierto(false)}
+          >
+            <i className={`bi ${e.icon}`}></i> {e.label}
+          </NavDropdown.Item>
+        ))}
+      </NavDropdown>
+    </div>
+  );
 }
 
 export default function NavbarSuperior({
@@ -108,13 +160,19 @@ export default function NavbarSuperior({
 
   const checkIsActive = (path: string) => pathname.includes(path);
 
-  // Enlaces de navegación (antes vivían en el sidebar)
-  const enlaces = [
-    { href: '/dashboard/trabajadores', icon: 'bi-people', label: 'Trabajadores' },
-    { href: '/dashboard/recepcion', icon: 'bi-book', label: 'Recepción' },
-    { href: '/dashboard/documentos', icon: 'bi-file-earmark-word', label: 'Documentos' },
+  // Enlaces agrupados en desplegables (se abren al pasar el cursor).
+  const enlacesTrabajadores = [
+    { href: '/dashboard/trabajadores', icon: 'bi-people', label: 'Ver trabajadores' },
     { href: '/dashboard/formulario', icon: 'bi-person-plus', label: 'Registrar' },
     { href: '/dashboard/carga-masiva', icon: 'bi-cloud-arrow-up', label: 'Carga Masiva' },
+  ];
+  const enlacesDocumentos = [
+    { href: '/dashboard/documentos', icon: 'bi-file-earmark-word', label: 'Notificaciones' },
+    { href: '/dashboard/recepcion', icon: 'bi-book', label: 'Recepción' },
+    { href: '/dashboard/finiquito', icon: 'bi-cash-coin', label: 'Finiquito' },
+    { href: '/dashboard/contratos', icon: 'bi-file-earmark-text', label: 'Contratos' },
+  ];
+  const enlacesSecundarios = [
     { href: '/dashboard/horas-compensatorias', icon: 'bi-clock-history', label: 'Horas Comp.' },
   ];
 
@@ -142,7 +200,22 @@ export default function NavbarSuperior({
         <Navbar.Collapse id="siscon-navbar">
           {/* NAVEGACIÓN PRINCIPAL */}
           <Nav className="me-auto gap-lg-1">
-            {enlaces.map((e) => (
+            <NavHoverDropdown
+              id="dropdown-trabajadores"
+              icon="bi-people"
+              label="Trabajadores"
+              items={enlacesTrabajadores}
+              checkIsActive={checkIsActive}
+            />
+            <NavHoverDropdown
+              id="dropdown-documentos"
+              icon="bi-folder2-open"
+              label="Documentos"
+              items={enlacesDocumentos}
+              checkIsActive={checkIsActive}
+            />
+
+            {enlacesSecundarios.map((e) => (
               <Nav.Link
                 key={e.href}
                 as={Link}
