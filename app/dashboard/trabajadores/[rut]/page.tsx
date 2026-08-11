@@ -9,6 +9,29 @@ import { Card, Badge, Button, Spinner, Modal, Form, Row, Col } from 'react-boots
 import { Trabajador, Contrato } from '@/types';
 import React from 'react';
 
+const PREVISIONES_AFP = [
+  'AFP Capital',
+  'AFP Cuprum',
+  'AFP Habitat',
+  'AFP Modelo',
+  'AFP PlanVital',
+  'AFP ProVida',
+  'AFP Uno',
+];
+
+const SISTEMAS_SALUD = [
+  'FONASA',
+  'BANMÉDICA',
+  'COLMENA',
+  'CONSALUD',
+  'CRUZ BLANCA',
+  'NUEVA MAS VIDA',
+  'VIDA TRES',
+  'ISAPRE FUNDACION',
+  'FUSAT',
+  'ESENCIAL',
+];
+
 export default function DetalleTrabajadorPage() {
   const params = useParams();
   const router = useRouter();
@@ -26,13 +49,26 @@ export default function DetalleTrabajadorPage() {
   const [editTermino, setEditTermino] = useState('');
   const [guardando, setGuardando] = useState(false);
 
+  // Estados Modal Datos Personales
+  const [modalPersonalAbierto, setModalPersonalAbierto] = useState(false);
+  const [editNacionalidad, setEditNacionalidad] = useState('');
+  const [editEstadoCivil, setEditEstadoCivil] = useState('');
+  const [editLugarNac, setEditLugarNac] = useState('');
+  const [editFechaNac, setEditFechaNac] = useState('');
+  const [editDomicilio, setEditDomicilio] = useState('');
+  const [editComuna, setEditComuna] = useState('');
+  const [editPrevision, setEditPrevision] = useState('');
+  const [editSalud, setEditSalud] = useState('');
+  const [editGenero, setEditGenero] = useState('');
+  const [guardandoPersonal, setGuardandoPersonal] = useState(false);
+
   const obtenerDetalle = async () => {
     if (!params.rut) return;
     setLoading(true);
     const { data, error } = await supabase
       .from('trabajadores')
       .select(
-        `rut, dv, nombres, primer_apellido, segundo_apellido, contratos(id, jornada, sueldo_base, fecha_inicio, fecha_termino)`,
+        `rut, dv, nombres, primer_apellido, segundo_apellido, genero, nacionalidad, estado_civil, lugar_nac, fecha_nac, domicilio, comuna, prevision, salud, contratos(id, jornada, sueldo_base, fecha_inicio, fecha_termino)`,
       )
       .eq('rut', parseInt(params.rut as string))
       .single();
@@ -63,6 +99,55 @@ export default function DetalleTrabajadorPage() {
     setEditInicio(c.fecha_inicio);
     setEditTermino(c.fecha_termino || '');
     setModalAbierto(true);
+  };
+
+  const abrirEdicionPersonal = () => {
+    if (!empleado) return;
+    setEditGenero(empleado.genero || '');
+    setEditNacionalidad(empleado.nacionalidad || '');
+    setEditEstadoCivil(empleado.estado_civil || '');
+    setEditLugarNac(empleado.lugar_nac || '');
+    setEditFechaNac(empleado.fecha_nac || '');
+    setEditDomicilio(empleado.domicilio || '');
+    setEditComuna(empleado.comuna || '');
+    setEditPrevision(empleado.prevision || '');
+    setEditSalud(empleado.salud || '');
+    setModalPersonalAbierto(true);
+  };
+
+  const handleGuardarPersonal = async () => {
+    if (!empleado) return;
+    const toastId = toast.loading('Guardando datos personales...');
+    setGuardandoPersonal(true);
+
+    const { error } = await supabase
+      .from('trabajadores')
+      .update({
+        genero: editGenero || null,
+        nacionalidad: editNacionalidad || null,
+        estado_civil: editEstadoCivil || null,
+        lugar_nac: editLugarNac || null,
+        fecha_nac: editFechaNac || null,
+        domicilio: editDomicilio || null,
+        comuna: editComuna || null,
+        prevision: editPrevision || null,
+        salud: editSalud || null,
+      })
+      .eq('rut', empleado.rut);
+
+    setGuardandoPersonal(false);
+
+    if (error) {
+      toast.error('Error al actualizar datos: ' + error.message, { id: toastId });
+    } else {
+      await registrarAuditoria(
+        'EDITAR_TRABAJADOR',
+        `Datos personales actualizados (RUT ${empleado.rut})`,
+      );
+      toast.success('Datos actualizados exitosamente', { id: toastId });
+      setModalPersonalAbierto(false);
+      await obtenerDetalle();
+    }
   };
 
   const handleGuardarCambios = async () => {
@@ -171,6 +256,14 @@ export default function DetalleTrabajadorPage() {
             <p className="text-light-50 m-0 mt-1 small">
               RUN: {empleado.rut}-{empleado.dv}
             </p>
+            <Button
+              variant="outline-info"
+              size="sm"
+              className="mt-3 d-flex align-items-center rounded-pill px-3"
+              onClick={abrirEdicionPersonal}
+            >
+              <i className="bi bi-pencil-square me-2"></i> Editar Datos Personales
+            </Button>
           </div>
           <i className="bi bi-person-badge text-white-50" style={{ fontSize: '3.5rem' }}></i>
         </Card.Body>
@@ -370,6 +463,137 @@ export default function DetalleTrabajadorPage() {
             disabled={guardando}
           >
             {guardando ? 'Guardando...' : 'Guardar Cambios'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* MODAL DE DATOS PERSONALES */}
+      <Modal
+        show={modalPersonalAbierto}
+        onHide={() => setModalPersonalAbierto(false)}
+        centered
+        contentClassName="border-0 shadow-lg"
+      >
+        <Modal.Header closeButton closeVariant="white" className="bg-info text-dark">
+          <Modal.Title className="fw-bold h5">Editar Datos Personales</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Row className="g-3">
+            <Col xs={6}>
+              <Form.Label className="small fw-bold text-secondary">Género</Form.Label>
+              <Form.Select
+                value={editGenero}
+                onChange={(e) => setEditGenero(e.target.value)}
+              >
+                <option value="">Seleccione...</option>
+                <option value="M">Masculino</option>
+                <option value="F">Femenino</option>
+              </Form.Select>
+            </Col>
+            <Col xs={6}>
+              <Form.Label className="small fw-bold text-secondary">Nacionalidad</Form.Label>
+              <Form.Control
+                type="text"
+                value={editNacionalidad}
+                onChange={(e) => setEditNacionalidad(e.target.value)}
+              />
+            </Col>
+            <Col xs={6}>
+              <Form.Label className="small fw-bold text-secondary">Estado Civil</Form.Label>
+              <Form.Select
+                value={editEstadoCivil}
+                onChange={(e) => setEditEstadoCivil(e.target.value)}
+              >
+                <option value="">Seleccione...</option>
+                <option value="Soltero">Soltero/a</option>
+                <option value="Casado">Casado/a</option>
+                <option value="Divorciado">Divorciado/a</option>
+                <option value="Viudo">Viudo/a</option>
+                <option value="Separado">Separado/a</option>
+                <option value="Conviviente civil">Conviviente civil</option>
+              </Form.Select>
+            </Col>
+            <Col xs={6}>
+              <Form.Label className="small fw-bold text-secondary">Lugar de Nacimiento</Form.Label>
+              <Form.Control
+                type="text"
+                value={editLugarNac}
+                onChange={(e) => setEditLugarNac(e.target.value)}
+              />
+            </Col>
+            <Col xs={6}>
+              <Form.Label className="small fw-bold text-secondary">Fecha de Nacimiento</Form.Label>
+              <Form.Control
+                type="date"
+                value={editFechaNac}
+                onChange={(e) => setEditFechaNac(e.target.value)}
+              />
+            </Col>
+            <Col xs={12}>
+              <Form.Label className="small fw-bold text-secondary">Domicilio</Form.Label>
+              <Form.Control
+                type="text"
+                value={editDomicilio}
+                onChange={(e) => setEditDomicilio(e.target.value)}
+              />
+            </Col>
+            <Col xs={6}>
+              <Form.Label className="small fw-bold text-secondary">Comuna</Form.Label>
+              <Form.Control
+                type="text"
+                value={editComuna}
+                onChange={(e) => setEditComuna(e.target.value)}
+              />
+            </Col>
+            <Col xs={6}>
+              <Form.Label className="small fw-bold text-secondary">Previsión (AFP)</Form.Label>
+              <Form.Select
+                value={editPrevision}
+                onChange={(e) => setEditPrevision(e.target.value)}
+              >
+                <option value="">Seleccione...</option>
+                {PREVISIONES_AFP.map((afp) => (
+                  <option key={afp} value={afp}>
+                    {afp}
+                  </option>
+                ))}
+              </Form.Select>
+            </Col>
+            <Col xs={6}>
+              <Form.Label className="small fw-bold text-secondary">Salud</Form.Label>
+              <Form.Select
+                value={editSalud}
+                onChange={(e) => setEditSalud(e.target.value)}
+              >
+                <option value="">Seleccione...</option>
+                {SISTEMAS_SALUD.map((salud) => (
+                  <option key={salud} value={salud}>
+                    {salud}
+                  </option>
+                ))}
+              </Form.Select>
+            </Col>
+          </Row>
+        </Modal.Body>
+        <Modal.Footer className="bg-light border-top-0">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline-secondary"
+            className="px-3"
+            onClick={() => setModalPersonalAbierto(false)}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="info"
+            className="px-4 fw-bold"
+            onClick={handleGuardarPersonal}
+            disabled={guardandoPersonal}
+          >
+            {guardandoPersonal ? 'Guardando...' : 'Guardar Cambios'}
           </Button>
         </Modal.Footer>
       </Modal>

@@ -112,7 +112,7 @@ export default function ModuloContratos() {
     const { data, error } = await supabase
       .from('trabajadores')
       .select(
-        'rut, dv, nombres, primer_apellido, segundo_apellido, genero, contratos(id, jornada, sueldo_base, fecha_inicio, fecha_termino, nacionalidad, estado_civil, lugar_nac, fecha_nac, domicilio, comuna, labores, lugar_trabajo, dependencia_dir, programa, prevision, salud, bono_movilizacion, bono_colacion)',
+        'rut, dv, nombres, primer_apellido, segundo_apellido, genero, nacionalidad, estado_civil, fecha_nac, lugar_nac, domicilio, comuna, prevision, salud, contratos(id, jornada, sueldo_base, fecha_inicio, fecha_termino, labores, lugar_trabajo, dependencia_dir, programa, bono_movilizacion, bono_colacion)',
       )
       .order('primer_apellido');
     if (error) {
@@ -142,26 +142,26 @@ export default function ModuloContratos() {
       .slice(0, 8);
   }, [busquedaDebounced, trabajadores]);
 
-  const aplicarContrato = (c: Contrato | null) => {
+  const aplicarContrato = (c: Contrato | null, t?: Trabajador | null) => {
     setInicio(c?.fecha_inicio ?? '');
     setTermino(c?.fecha_termino ?? '');
     setSueldo(c?.sueldo_base ?? 0);
     setJornada(c?.jornada ?? 44);
-    // Datos de la plantilla guardados en el contrato (si existen).
-    setNacionalidad(c?.nacionalidad ?? 'Chilena');
-    setEstadoCivilId(estadoCivilIdDesdeLabel(c?.estado_civil));
-    setLugarNac(c?.lugar_nac ?? '');
-    setFechaNac(c?.fecha_nac ?? '');
-    setDomicilio(c?.domicilio ?? '');
-    setComuna(c?.comuna ?? '');
+    // Datos de la plantilla guardados en el trabajador (si existen).
+    setNacionalidad(t?.nacionalidad ?? 'Chilena');
+    setEstadoCivilId(estadoCivilIdDesdeLabel(t?.estado_civil));
+    setLugarNac(t?.lugar_nac ?? '');
+    setFechaNac(t?.fecha_nac ?? '');
+    setDomicilio(t?.domicilio ?? '');
+    setComuna(t?.comuna ?? '');
     setLabores(c?.labores ?? '');
     setLugarTrabajo(c?.lugar_trabajo ?? '');
     setDependenciaDir(c?.dependencia_dir ?? '');
     if (c?.programa && PROGRAMAS_CONTRATO.some((p) => p.id === c.programa)) {
       setProgramaId(c.programa);
     }
-    setPrevision(c?.prevision ?? 'AFP Uno');
-    setSalud(c?.salud ?? 'FONASA');
+    setPrevision(t?.prevision ?? 'AFP Uno');
+    setSalud(t?.salud ?? 'FONASA');
     const mov = c?.bono_movilizacion ?? 0;
     const col = c?.bono_colacion ?? 0;
     setBonoMov(mov);
@@ -180,7 +180,7 @@ export default function ModuloContratos() {
     setIdGenero(t.genero === 'M' || t.genero === 'F' ? t.genero : '');
     const c = contratoSugerido(t);
     setContratoSelId(c?.id ?? '');
-    aplicarContrato(c);
+    aplicarContrato(c, t);
   };
 
   const limpiarIdentidad = () => {
@@ -205,7 +205,7 @@ export default function ModuloContratos() {
 
   const cambiarContrato = (id: string) => {
     setContratoSelId(id);
-    aplicarContrato(trabajadorSel?.contratos?.find((c) => c.id === id) ?? null);
+    aplicarContrato(trabajadorSel?.contratos?.find((c) => c.id === id) ?? null, trabajadorSel);
   };
 
   const rutNumero = parseInt(idRut.replace(/\D/g, '')) || 0;
@@ -294,6 +294,14 @@ export default function ModuloContratos() {
         primer_apellido: idApellidoP.trim().toUpperCase(),
         segundo_apellido: idApellidoM.trim() ? idApellidoM.trim().toUpperCase() : null,
         genero: idGenero || null,
+        nacionalidad: nacionalidad || null,
+        estado_civil: estadoCivilLabel(estadoCivilId, idGenero || undefined),
+        lugar_nac: lugarNac || null,
+        fecha_nac: fechaNac || null,
+        domicilio: domicilio || null,
+        comuna: comuna || null,
+        prevision: prevision || null,
+        salud: salud || null,
       });
       if (errT) {
         toast.error(`No se pudo registrar al trabajador: ${errT.message}`);
@@ -303,14 +311,21 @@ export default function ModuloContratos() {
         ACCIONES.CREAR_TRABAJADOR,
         `RUT ${rutNumero}-${idDv.toUpperCase()}: ${idNombres.trim()} ${idApellidoP.trim()} ${idApellidoM.trim()}`.trim(),
       );
-    } else if (
-      modo === 'existente' &&
-      idGenero &&
-      trabajadorSel &&
-      trabajadorSel.genero !== idGenero
-    ) {
-      // Completa el género si faltaba en la base.
-      await supabase.from('trabajadores').update({ genero: idGenero }).eq('rut', rutNumero);
+    } else if (modo === 'existente' && trabajadorSel) {
+      await supabase
+        .from('trabajadores')
+        .update({
+          genero: idGenero || null,
+          nacionalidad: nacionalidad || null,
+          estado_civil: estadoCivilLabel(estadoCivilId, idGenero || undefined),
+          lugar_nac: lugarNac || null,
+          fecha_nac: fechaNac || null,
+          domicilio: domicilio || null,
+          comuna: comuna || null,
+          prevision: prevision || null,
+          salud: salud || null,
+        })
+        .eq('rut', rutNumero);
     }
 
     // Alta del contrato (con todos los datos de la plantilla).
@@ -320,18 +335,10 @@ export default function ModuloContratos() {
       sueldo_base: sueldo,
       fecha_inicio: inicio,
       fecha_termino: termino || null,
-      nacionalidad: nacionalidad || null,
-      estado_civil: estadoCivilLabel(estadoCivilId, idGenero || undefined),
-      lugar_nac: lugarNac || null,
-      fecha_nac: fechaNac || null,
-      domicilio: domicilio || null,
-      comuna: comuna || null,
       labores: labores || null,
       lugar_trabajo: lugarTrabajo || null,
       dependencia_dir: dependenciaDir || null,
       programa: programaId || null,
-      prevision: prevision || null,
-      salud: salud || null,
       bono_movilizacion: incluirBonos ? bonoMov : 0,
       bono_colacion: incluirBonos ? bonoCol : 0,
     });

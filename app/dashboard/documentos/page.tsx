@@ -63,9 +63,10 @@ export default function ModuloGeneracionDocumentos() {
       const { data, error } = await supabase
         .from('trabajadores')
         .select(
-          'rut, dv, nombres, primer_apellido, segundo_apellido, contratos(id, jornada, sueldo_base, fecha_inicio, fecha_termino)',
+          'rut, dv, nombres, primer_apellido, segundo_apellido, genero, contratos(id, jornada, sueldo_base, fecha_inicio, fecha_termino)',
         )
         .order('primer_apellido');
+      console.table(data);
 
       if (error) {
         toast.error('Error al cargar la base de datos de trabajadores.');
@@ -92,6 +93,7 @@ export default function ModuloGeneracionDocumentos() {
   const seleccionarTrabajador = (t: Trabajador) => {
     setTrabajadorSel(t);
     setBusqueda('');
+    console.table(t);
     // Preselecciona el contrato vigente (o el más reciente).
     const contratos = t.contratos ?? [];
     const vigente = contratos.find(
@@ -343,7 +345,9 @@ export default function ModuloGeneracionDocumentos() {
 
                 <Row className="g-3">
                   <Col xs={6} md={4}>
-                    <Form.Label className="small fw-bold text-secondary">Notificación Nº</Form.Label>
+                    <Form.Label className="small fw-bold text-secondary">
+                      Notificación Nº
+                    </Form.Label>
                     <Form.Control
                       type="text"
                       placeholder="1234"
@@ -372,7 +376,9 @@ export default function ModuloGeneracionDocumentos() {
                     />
                   </Col>
                   <Col xs={6} md={3}>
-                    <Form.Label className="small fw-bold text-secondary">Iniciales redactor</Form.Label>
+                    <Form.Label className="small fw-bold text-secondary">
+                      Iniciales redactor
+                    </Form.Label>
                     <Form.Control
                       type="text"
                       value={notif.redactor_iniciales}
@@ -383,7 +389,10 @@ export default function ModuloGeneracionDocumentos() {
                     <Form.Label className="small fw-bold text-secondary">
                       Causal de término (artículo del Código del Trabajo)
                     </Form.Label>
-                    <Form.Select value={causalId} onChange={(e) => seleccionarCausal(e.target.value)}>
+                    <Form.Select
+                      value={causalId}
+                      onChange={(e) => seleccionarCausal(e.target.value)}
+                    >
                       {CAUSALES.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.etiqueta}

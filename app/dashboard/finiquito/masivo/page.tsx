@@ -199,6 +199,7 @@ export default function FiniquitoMasivoPage() {
       const contratoBase = s.trabajador.contratos?.find((c) => c.id === s.contratoId) ?? null;
       const contratoAjustado: Contrato = {
         id: s.contratoId,
+        trabajador_rut: s.rut,
         fecha_inicio: s.fechaInicio,
         fecha_termino: s.fechaTermino,
         sueldo_base: s.sueldoImponible,

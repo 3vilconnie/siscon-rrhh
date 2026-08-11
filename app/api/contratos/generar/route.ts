@@ -61,8 +61,7 @@ export async function POST(request: Request) {
       });
     });
 
-    const rutSlug = datos.trabajador?.rut_miles?.replace(/\./g, '') ?? 'documento';
-    const nombreArchivo = `contrato_${rutSlug}.${formato}`;
+    const nombreArchivo = `Contrato ${datos.trabajador.nombre_upper} ${datos.trabajador.apellido_p_upper} ${datos.trabajador.apellido_m_upper}.${formato}`;
 
     return new NextResponse(new Uint8Array(resultado), {
       status: 200,

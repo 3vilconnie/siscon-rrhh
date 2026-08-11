@@ -45,5 +45,6 @@
     "supabase",
     "Trabajador",
     "Trabajadores"
-  ]
+  ],
+  "CodeGPT.apiKey": "Google AI Studio"
 }

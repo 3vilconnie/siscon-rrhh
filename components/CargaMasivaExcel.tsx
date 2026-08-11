@@ -108,13 +108,16 @@ export default function CargaMasivaExcel() {
         if (!rut || isNaN(Number(rut))) continue;
 
         // A) Sincronizar Identidad
-        const { error: errT } = await supabase.from('trabajadores').upsert({
-          rut: parseInt(rut),
-          dv: String(dv).toUpperCase().trim(),
-          primer_apellido: String(primerAp).toUpperCase().trim(),
-          segundo_apellido: segundoAp ? String(segundoAp).toUpperCase().trim() : null,
-          nombres: String(nombres).toUpperCase().trim(),
-        });
+        const { error: errT } = await supabase.from('trabajadores').upsert(
+          {
+            rut: parseInt(rut),
+            dv: String(dv).toUpperCase().trim(),
+            primer_apellido: String(primerAp).toUpperCase().trim(),
+            segundo_apellido: segundoAp ? String(segundoAp).toUpperCase().trim() : null,
+            nombres: String(nombres).toUpperCase().trim(),
+          },
+          { onConflict: 'rut' },
+        );
         if (errT) throw errT;
 
         // B) Insertar Periodo Contractual

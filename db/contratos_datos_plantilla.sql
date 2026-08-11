@@ -7,7 +7,7 @@
 --  Todas las columnas son opcionales: los contratos existentes quedan con NULL.
 -- =====================================================================
 
-alter table public.contratos
+alter table public.trabajadores
   -- Datos personales del trabajador (recopilados al hacer el contrato)
   add column if not exists nacionalidad     text,
   add column if not exists estado_civil      text,
@@ -15,13 +15,15 @@ alter table public.contratos
   add column if not exists fecha_nac         date,
   add column if not exists domicilio         text,
   add column if not exists comuna            text,
+  add column if not exists prevision         text,   -- AFP
+  add column if not exists salud             text;   -- FONASA / Isapre
+
+alter table public.contratos
   -- Datos propios del contrato
   add column if not exists labores           text,
   add column if not exists lugar_trabajo     text,
   add column if not exists dependencia_dir   text,
   add column if not exists programa          text,   -- PZD1 / PZD3 / CONADI
-  add column if not exists prevision         text,   -- AFP
-  add column if not exists salud             text,   -- FONASA / Isapre
   add column if not exists bono_movilizacion numeric default 0,
   add column if not exists bono_colacion     numeric default 0;
 

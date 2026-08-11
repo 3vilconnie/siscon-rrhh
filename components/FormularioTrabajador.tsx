@@ -20,6 +20,7 @@ export default function FormularioTrabajador() {
   const [fechaTermino, setFechaTermino] = useState('');
 
   // Estados de control UX
+  const [trabajadorId, setTrabajadorId] = useState<string | null>(null);
   const [buscandoRut, setBuscandoRut] = useState(false);
   const [existeTrabajador, setExisteTrabajador] = useState(false);
   const [bloqueado, setBloqueado] = useState(false);
@@ -54,7 +55,7 @@ export default function FormularioTrabajador() {
       const timer = setTimeout(async () => {
         const { data, error } = await supabase
           .from('trabajadores')
-          .select('nombres, primer_apellido, segundo_apellido')
+          .select('rut, nombres, primer_apellido, segundo_apellido')
           .eq('rut', parseInt(cuerpoRut))
           .single();
 
@@ -86,6 +87,7 @@ export default function FormularioTrabajador() {
   }, [rut]);
 
   const handleLimpiarFormulario = () => {
+    setTrabajadorId(null);
     setRut('');
     setDv('');
     setNombres('');
