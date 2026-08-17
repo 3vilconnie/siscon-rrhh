@@ -7,30 +7,8 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Card, Badge, Button, Spinner, Modal, Form, Row, Col } from 'react-bootstrap';
 import { Trabajador, Contrato } from '@/types';
+import { AFP_OPCIONES as PREVISIONES_AFP, SALUD_OPCIONES as SISTEMAS_SALUD } from '@/lib/contrato';
 import React from 'react';
-
-const PREVISIONES_AFP = [
-  'AFP Capital',
-  'AFP Cuprum',
-  'AFP Habitat',
-  'AFP Modelo',
-  'AFP PlanVital',
-  'AFP ProVida',
-  'AFP Uno',
-];
-
-const SISTEMAS_SALUD = [
-  'FONASA',
-  'BANMÉDICA',
-  'COLMENA',
-  'CONSALUD',
-  'CRUZ BLANCA',
-  'NUEVA MAS VIDA',
-  'VIDA TRES',
-  'ISAPRE FUNDACION',
-  'FUSAT',
-  'ESENCIAL',
-];
 
 export default function DetalleTrabajadorPage() {
   const params = useParams();
@@ -68,7 +46,7 @@ export default function DetalleTrabajadorPage() {
     const { data, error } = await supabase
       .from('trabajadores')
       .select(
-        `rut, dv, nombres, primer_apellido, segundo_apellido, genero, nacionalidad, estado_civil, lugar_nac, fecha_nac, domicilio, comuna, prevision, salud, contratos(id, jornada, sueldo_base, fecha_inicio, fecha_termino)`,
+        `rut, dv, nombres, primer_apellido, segundo_apellido, genero, nacionalidad, estado_civil, lugar_nac, fecha_nac, domicilio, comuna, prevision, salud, contratos(id, jornada, sueldo_base, fecha_inicio, fecha_termino, tipo, contrato_origen_id)`,
       )
       .eq('rut', parseInt(params.rut as string))
       .single();
@@ -334,12 +312,35 @@ export default function DetalleTrabajadorPage() {
                       <div className="d-flex justify-content-between align-items-start mb-2">
                         <h6 className="fw-bold text-uppercase text-dark m-0 d-flex align-items-center">
                           <i className="bi bi-file-earmark-person me-2 text-primary"></i>
-                          Contrato Registrado
+                          {c.tipo === 'anexo' ? 'Anexo de Ampliación' : 'Contrato Registrado'}
                         </h6>
-                        <Badge bg={esVigente ? 'success' : 'secondary'}>
-                          {esVigente ? 'Vigente' : 'Terminado'}
-                        </Badge>
+                        <div className="d-flex gap-2">
+                          {c.tipo === 'anexo' && (
+                            <Badge bg="info-subtle" text="info" className="border fw-normal">
+                              <i className="bi bi-file-earmark-plus me-1"></i>Anexo
+                            </Badge>
+                          )}
+                          <Badge bg={esVigente ? 'success' : 'secondary'}>
+                            {esVigente ? 'Vigente' : 'Terminado'}
+                          </Badge>
+                        </div>
                       </div>
+
+                      {c.tipo === 'anexo' &&
+                        (() => {
+                          const origen = empleado.contratos?.find(
+                            (o) => o.id === c.contrato_origen_id,
+                          );
+                          return origen ? (
+                            <div className="text-muted small mb-2">
+                              <i className="bi bi-link-45deg me-1"></i>
+                              Amplía el contrato iniciado el{' '}
+                              {new Date(origen.fecha_inicio + 'T00:00:00').toLocaleDateString(
+                                'es-CL',
+                              )}
+                            </div>
+                          ) : null;
+                        })()}
 
                       <Row className="mt-3 text-dark small">
                         <Col sm={6} className="mb-2">

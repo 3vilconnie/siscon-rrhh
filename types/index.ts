@@ -14,6 +14,8 @@ export interface Contrato {
   bono_movilizacion?: number | null;
   bono_colacion?: number | null;
   count?: number;
+  tipo?: 'contrato' | 'anexo';
+  contrato_origen_id?: string | null;
 }
 
 export interface Trabajador {
@@ -36,6 +38,23 @@ export interface Trabajador {
   num_contratos?: number;
 }
 
+
+export interface PlantillaContrato {
+  id: string;
+  nombre: string;
+  programa: string;
+  labores: string | null;
+  lugar_trabajo: string | null;
+  dependencia_dir: string | null;
+  jornada: number | null;
+  incluir_bonos: boolean;
+  bono_movilizacion: number;
+  bono_colacion: number;
+  ciudad: string | null;
+  iniciales_redactor: string | null;
+  sueldo_sugerido: number;
+  created_at?: string;
+}
 
 export interface AlertaNotificacion {
   rut: number;

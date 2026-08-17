@@ -15,7 +15,7 @@ import {
   ListGroup,
   ButtonGroup,
 } from 'react-bootstrap';
-import { Trabajador, Contrato } from '@/types';
+import { Trabajador, Contrato, PlantillaContrato } from '@/types';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { formatearRutFiniquito } from '@/lib/finiquito';
 import {
@@ -23,6 +23,8 @@ import {
   DIRECTOR_CONTRATO_DEFAULT,
   CAMPOS_CONTRATO,
   ESTADOS_CIVILES,
+  AFP_OPCIONES,
+  SALUD_OPCIONES,
   estadoCivilLabel,
   estadoCivilIdDesdeLabel,
   construirDatosContrato,
@@ -36,33 +38,13 @@ export default function ModuloContratos() {
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [loading, setLoading] = useState(true);
   const [modo, setModo] = useState<Modo>('existente');
-  const [afp, setAfp] = useState([
-    'AFP Capital',
-    'AFP Cuprum',
-    'AFP Habitat',
-    'AFP Modelo',
-    'AFP PlanVital',
-    'AFP ProVida',
-    'AFP Uno',
-  ]);
-  const [previsiones_salud, setPrevisiones_salud] = useState([
-    'FONASA',
-    'BANMÉDICA',
-    'COLMENA',
-    'CONSALUD',
-    'CRUZ BLANCA',
-    'NUEVA MAS VIDA',
-    'VIDA TRES',
-    'ISAPRE FUNDACION',
-    'FUSAT',
-    'ESENCIAL',
-  ]);
 
   // Búsqueda / selección (modo existente)
   const [busqueda, setBusqueda] = useState('');
   const busquedaDebounced = useDebounce(busqueda, 300);
   const [trabajadorSel, setTrabajadorSel] = useState<Trabajador | null>(null);
   const [contratoSelId, setContratoSelId] = useState('');
+  const [esAnexo, setEsAnexo] = useState(false);
 
   // Identidad del trabajador (editable; se prellena en modo existente).
   const [idNombres, setIdNombres] = useState('');
@@ -108,6 +90,10 @@ export default function ModuloContratos() {
   const [guardar, setGuardar] = useState(false);
   const [generando, setGenerando] = useState<'pdf' | 'docx' | null>(null);
 
+  // Plantillas de contrato (moldes reutilizables).
+  const [plantillas, setPlantillas] = useState<PlantillaContrato[]>([]);
+  const [plantillaSeleccionadaId, setPlantillaSeleccionadaId] = useState('');
+
   const cargarTrabajadores = async () => {
     const { data, error } = await supabase
       .from('trabajadores')
@@ -122,13 +108,42 @@ export default function ModuloContratos() {
     setTrabajadores((data as Trabajador[]) ?? []);
   };
 
+  const cargarPlantillas = async () => {
+    const { data, error } = await supabase
+      .from('plantillas_contrato')
+      .select('*')
+      .order('nombre');
+    if (error) {
+      console.error(error);
+      return;
+    }
+    setPlantillas((data as PlantillaContrato[]) ?? []);
+  };
+
   useEffect(() => {
     (async () => {
       setLoading(true);
-      await cargarTrabajadores();
+      await Promise.all([cargarTrabajadores(), cargarPlantillas()]);
       setLoading(false);
     })();
   }, []);
+
+  const aplicarPlantilla = (id: string) => {
+    setPlantillaSeleccionadaId(id);
+    const p = plantillas.find((x) => x.id === id);
+    if (!p) return;
+    if (PROGRAMAS_CONTRATO.some((prog) => prog.id === p.programa)) setProgramaId(p.programa);
+    setLabores(p.labores ?? '');
+    setLugarTrabajo(p.lugar_trabajo ?? '');
+    setDependenciaDir(p.dependencia_dir ?? '');
+    setJornada(p.jornada ?? 44);
+    setIncluirBonos(p.incluir_bonos);
+    setBonoMov(p.bono_movilizacion);
+    setBonoCol(p.bono_colacion);
+    setCiudad(p.ciudad ?? 'Arica');
+    setRedactor(p.iniciales_redactor ?? 'crh');
+    if (!sueldo) setSueldo(p.sueldo_sugerido);
+  };
 
   const resultados = useMemo(() => {
     const q = busquedaDebounced.trim().toLowerCase();
@@ -186,6 +201,7 @@ export default function ModuloContratos() {
   const limpiarIdentidad = () => {
     setTrabajadorSel(null);
     setContratoSelId('');
+    setEsAnexo(false);
     setIdNombres('');
     setIdApellidoP('');
     setIdApellidoM('');
@@ -341,6 +357,8 @@ export default function ModuloContratos() {
       programa: programaId || null,
       bono_movilizacion: incluirBonos ? bonoMov : 0,
       bono_colacion: incluirBonos ? bonoCol : 0,
+      tipo: esAnexo ? 'anexo' : 'contrato',
+      contrato_origen_id: esAnexo ? contratoSelId || null : null,
     });
     if (errC) {
       const msg = /exclusion/i.test(errC.message)
@@ -581,6 +599,24 @@ export default function ModuloContratos() {
                       </Form.Select>
                     </Col>
                   )}
+                  {modo === 'existente' && (trabajadorSel?.contratos ?? []).length > 0 && (
+                    <Col xs={12}>
+                      <Form.Check
+                        type="switch"
+                        id="es-anexo-individual"
+                        checked={esAnexo}
+                        disabled={!contratoSelId}
+                        onChange={(e) => setEsAnexo(e.target.checked)}
+                        label="Este contrato es un Anexo de Ampliación del contrato seleccionado arriba"
+                      />
+                      {esAnexo && !contratoSelId && (
+                        <div className="text-warning small mt-1">
+                          <i className="bi bi-exclamation-triangle me-1"></i>
+                          Selecciona el contrato que se está ampliando.
+                        </div>
+                      )}
+                    </Col>
+                  )}
                   <Col xs={6} md={3}>
                     {label('Género')}
                     <Form.Select value={idGenero} onChange={(e) => setIdGenero(e.target.value)}>
@@ -699,6 +735,28 @@ export default function ModuloContratos() {
                     </Badge>
                     Detalle del contrato
                   </h6>
+
+                  <div className="bg-light border border-primary-subtle rounded p-3 mb-3">
+                    {label('Cargar desde plantilla')}
+                    <Form.Select
+                      value={plantillaSeleccionadaId}
+                      onChange={(e) => aplicarPlantilla(e.target.value)}
+                    >
+                      <option value="">— Rellenar manualmente —</option>
+                      {plantillas.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.nombre}
+                        </option>
+                      ))}
+                    </Form.Select>
+                    {plantillas.length === 0 && (
+                      <Form.Text className="text-muted">
+                        Aún no tienes plantillas guardadas.{' '}
+                        <Link href="/dashboard/contratos/plantillas">Crea una aquí</Link>.
+                      </Form.Text>
+                    )}
+                  </div>
+
                   <Row className="g-3">
                     <Col xs={12}>
                       {label('Programa / Proyecto (cabecera)')}
@@ -748,7 +806,7 @@ export default function ModuloContratos() {
                     <Col xs={6} md={3}>
                       {label('Previsión')}
                       <Form.Select value={prevision} onChange={(e) => setPrevision(e.target.value)}>
-                        {afp.map((a) => (
+                        {AFP_OPCIONES.map((a) => (
                           <option key={a} value={a}>
                             {a}
                           </option>
@@ -758,7 +816,7 @@ export default function ModuloContratos() {
                     <Col xs={6} md={3}>
                       {label('Salud')}
                       <Form.Select value={salud} onChange={(e) => setSalud(e.target.value)}>
-                        {previsiones_salud.map((p) => (
+                        {SALUD_OPCIONES.map((p) => (
                           <option key={p} value={p}>
                             {p}
                           </option>

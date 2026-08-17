@@ -40,7 +40,7 @@ export async function GET(req: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      // 3. ¡Éxito! Redirigimos a la ruta protegida (ej: /dashboard/actualizar-password)
+      // 3. ¡Éxito! Redirigimos a la ruta protegida (ej: /actualizar-password)
       return NextResponse.redirect(`${origin}${next}`);
     } else {
       console.error('Error en el intercambio de código Auth:', error.message);

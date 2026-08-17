@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { registrarAuditoria, ACCIONES } from '@/lib/auditoria';
+import { calcularDV } from '@/lib/rut';
 import { toast } from 'react-hot-toast';
 import { Card, Form, Row, Col, InputGroup, Button, Spinner, Alert } from 'react-bootstrap';
 
@@ -26,22 +27,6 @@ export default function FormularioTrabajador() {
   const [bloqueado, setBloqueado] = useState(false);
   const [mostrarContrato, setMostrarContrato] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  const calcularDV = (rutAncho: string) => {
-    const cuerpo = rutAncho.replace(/[^0-9]/g, '');
-    if (!cuerpo) return '';
-    let suma = 0;
-    let multiplicador = 2;
-    for (let i = cuerpo.length - 1; i >= 0; i--) {
-      suma += multiplicador * parseInt(cuerpo.charAt(i));
-      multiplicador = multiplicador === 7 ? 2 : multiplicador + 1;
-    }
-    const resto = suma % 11;
-    const dvCalculado = 11 - resto;
-    if (dvCalculado === 11) return '0';
-    if (dvCalculado === 10) return 'K';
-    return dvCalculado.toString();
-  };
 
   // UX: Monitor dinámico del RUT con debounce
   useEffect(() => {

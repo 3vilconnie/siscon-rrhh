@@ -1,10 +1,12 @@
 'use client';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Card, Form, Button, Alert } from 'react-bootstrap';
 
 export default function LoginPage() {
+  const router = useRouter();
+
   // Controles del formulario estándar
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +33,7 @@ export default function LoginPage() {
       setErrorMsg('Credenciales inválidas. Inténtalo de nuevo.');
       setLoading(false);
     } else {
-      redirect('dashboard/trabajadores');
+      router.push('/dashboard/trabajadores');
     }
   };
 
@@ -43,13 +45,13 @@ export default function LoginPage() {
     setSuccessMsg('');
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/api/auth/callback?next=/dashboard/actualizar-password`,
+      redirectTo: `${window.location.origin}/api/auth/callback?next=/actualizar-password`,
     });
 
     setLoading(false);
 
     if (error) {
-      setErrorMsg(`Error: ${error.message}`);
+      setErrorMsg('No se pudo enviar el enlace. Intenta nuevamente en unos minutos.');
     } else {
       setSuccessMsg(
         '📨 Enlace enviado. Revisa tu correo electrónico para restablecer tu contraseña.',

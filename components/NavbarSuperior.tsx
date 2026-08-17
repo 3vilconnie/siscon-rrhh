@@ -158,8 +158,6 @@ export default function NavbarSuperior({
 
   const conteoNoLeidas = alertas.filter((a) => !a.leida).length;
 
-  const checkIsActive = (path: string) => pathname.includes(path);
-
   // Enlaces agrupados en desplegables (se abren al pasar el cursor).
   const enlacesTrabajadores = [
     { href: '/dashboard/trabajadores', icon: 'bi-people', label: 'Ver trabajadores' },
@@ -171,10 +169,29 @@ export default function NavbarSuperior({
     { href: '/dashboard/recepcion', icon: 'bi-book', label: 'Recepción' },
     { href: '/dashboard/finiquito', icon: 'bi-cash-coin', label: 'Finiquito' },
     { href: '/dashboard/contratos', icon: 'bi-file-earmark-text', label: 'Contratos' },
+    {
+      href: '/dashboard/contratos/plantillas',
+      icon: 'bi-file-earmark-ruled',
+      label: 'Plantillas de Contrato',
+    },
   ];
   const enlacesSecundarios = [
     { href: '/dashboard/horas-compensatorias', icon: 'bi-clock-history', label: 'Horas Comp.' },
   ];
+
+  // El enlace "activo" es el de href más específico (más largo) que hace match con la
+  // ruta actual — evita que una ruta anidada (ej. /dashboard/contratos/plantillas)
+  // resalte a la vez su propio enlace y el de su ruta padre (/dashboard/contratos).
+  const todosLosEnlaces = [
+    ...enlacesTrabajadores,
+    ...enlacesDocumentos,
+    ...enlacesSecundarios,
+    { href: '/dashboard/admin', icon: 'bi-gear-fill', label: 'Admin' },
+  ];
+  const enlaceActivo = todosLosEnlaces
+    .filter((e) => pathname === e.href || pathname.startsWith(`${e.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  const checkIsActive = (path: string) => path === enlaceActivo;
 
   const iniciales = nombreUsuario.substring(0, 2).toUpperCase();
 

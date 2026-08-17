@@ -186,6 +186,31 @@ function textosGenero(genero?: string): DatosContrato['g'] {
   };
 }
 
+/** Catálogo único de AFP, usado en todos los formularios que piden "Previsión". */
+export const AFP_OPCIONES = [
+  'AFP Capital',
+  'AFP Cuprum',
+  'AFP Habitat',
+  'AFP Modelo',
+  'AFP PlanVital',
+  'AFP ProVida',
+  'AFP Uno',
+];
+
+/** Catálogo único de sistemas de salud, usado en todos los formularios que piden "Salud". */
+export const SALUD_OPCIONES = [
+  'FONASA',
+  'BANMÉDICA',
+  'COLMENA',
+  'CONSALUD',
+  'CRUZ BLANCA',
+  'NUEVA MAS VIDA',
+  'VIDA TRES',
+  'ISAPRE FUNDACION',
+  'FUSAT',
+  'ESENCIAL',
+];
+
 /** Estados civiles (con forma masculina/femenina). */
 export const ESTADOS_CIVILES = [
   { id: 'soltero', m: 'Soltero', f: 'Soltera' },
@@ -462,4 +487,133 @@ export const CAMPOS_CONTRATO: CampoContrato[] = [
   { marcador: '{d.contrato.salud}', descripcion: 'Sistema de salud' },
   { marcador: '{d.bonos.mov_texto} / {d.bonos.col_texto}', descripcion: 'Bonos movilización / colación' },
   { marcador: '{d.director.nombre}', descripcion: 'Nombre del director (firmante)' },
+];
+
+// ---------------------------------------------------------------------------
+// Exportación a SIGPER (carga masiva de personal, sector público).
+//
+// Códigos institucionales fijos, asignados por SIGPER/DIPRES para los
+// programas de fondo de terceros que administra CONAF. No dependen de datos
+// de la app; se hardcodean aquí igual que PROGRAMAS_CONTRATO.
+// ---------------------------------------------------------------------------
+
+/** Códigos SIGPER constantes para todos los programas de fondo de terceros. */
+export const SIGPER_CONSTANTES = {
+  escalafonDipres: 4, // Tipo contrato fondo de terceros
+  programaPresupuestario: 99, // Fondo de terceros
+  programa: 999, // Fondo de terceros
+  subPrograma: 1, // ADM Unidades Demandantes
+  tarea: 1, // Remuneraciones
+  actividad: 1, // Remuneraciones
+  fuenteFinanciamiento: 1,
+  seccion: 1010, // Dirección Regional
+};
+
+/** Catálogo SIGPER de "Proyecto" por programa. No coincide 1:1 con PROGRAMAS_CONTRATO:
+ *  PZD2 y Picaflor son solo para SIGPER, no generan contrato Word en este sistema. */
+export const SIGPER_PROGRAMAS = [
+  { id: 'PZD1', etiqueta: 'PZD1', proyecto: 27 },
+  { id: 'PZD2', etiqueta: 'PZD2', proyecto: 29 },
+  { id: 'PZD3', etiqueta: 'PZD3', proyecto: 28 },
+  { id: 'CONADI', etiqueta: 'CONADI', proyecto: 9 },
+  { id: 'PICAFLOR', etiqueta: 'Picaflor', proyecto: 26 },
+];
+
+/** Cargo legal + Escalafón SIGPER, pareados según si el trabajador es Obrero o Profesional. */
+export const SIGPER_TIPO_TRABAJADOR = {
+  obrero: { cargoLegal: 70, escalafon: 12, etiqueta: 'Obrero' },
+  profesional: { cargoLegal: 78, escalafon: 11, etiqueta: 'Profesional' },
+} as const;
+
+export type SigperTipoTrabajador = keyof typeof SIGPER_TIPO_TRABAJADOR;
+
+/** Infiere la Unidad laboral SIGPER desde el "Lugar de trabajo" (comuna) ya usado en el contrato. */
+export function unidadLaboralSigperDesdeLugar(lugarTrabajo: string): number | null {
+  const l = lugarTrabajo.trim().toLowerCase();
+  if (l.includes('putre')) return 11504; // Área Putre
+  if (l.includes('arica')) return 11502; // Oficina Regional Arica y Parinacota
+  return null;
+}
+
+/** Encabezados de la hoja "Datos carga", en el orden exacto que espera SIGPER. */
+export const SIGPER_ENCABEZADOS_DATOS_CARGA = [
+  'RUN funcionario',
+  'Escalafón',
+  'Escalafón DIPRES',
+  'Cargo legal',
+  'Jornada',
+  'Unidad laboral',
+  'Sección',
+  'Proyecto',
+  'Fuente de financiamiento',
+  'Programa presupuestario',
+  'Programa',
+  'Sub programa',
+  'Tarea',
+  'Actividad',
+  'Fecha inicio',
+  'Fecha término',
+  'Sueldo base',
+];
+
+/** Hoja "Estructura carga": documentación estática, copiada de la plantilla oficial de SIGPER. */
+export const SIGPER_ESTRUCTURA_CARGA: [string, string, string][] = [
+  ['Campo', 'Tipo dato', 'Alcance'],
+  ['RUN funcionario', 'N(9)', 'Sin dígito verificador'],
+  ['Escalafón', 'C(6)', 'Según tabla "Escalafón instituciones"'],
+  ['Escalafón DIPRES', 'N(6)', 'Según tabla'],
+  ['Cargo legal', 'N(6)', 'Según tabla "Cargos"'],
+  ['Jornada', 'N(2,1)', ''],
+  ['Unidad laboral', 'N(7)', 'Según tabla "Unidades laborales"'],
+  ['Sección', 'N(4)', 'Según tabla "Seccion administrativa"'],
+  ['Proyecto', 'N(10)', 'Según tabla "Proyectos"'],
+  ['Fuente de financiamiento', 'N(2)', 'Según tabla "Fuente de financiamiento"'],
+  ['Programa presupuestario', 'C(4)', 'Según tabla "Programa presupuestario"'],
+  ['Estructura Programática - Programa', 'C(4)', 'Según tabla "Programa"'],
+  ['Estructura programática - Sub programa', 'C(4)', 'Según tabla "Sub programa"'],
+  ['Estructura programática - Tarea', 'C(4)', 'Según tabla "Tarea"'],
+  ['Estructura programática - Actividad', 'C(4)', 'Según tabla "Actividad"'],
+  ['Fecha inicio', 'D(8)', 'DD-MM-YYYY'],
+  ['Fecha término', 'D(8)', 'DD-MM-YYYY'],
+  ['Sueldo base', 'N(13)', 'Sin separador de miles'],
+];
+
+// ---------------------------------------------------------------------------
+// SIGPER — Reconocimiento de Haberes (voucher de bonos de movilización y
+// colación). Formato .xls (BIFF8) heredado, distinto del de la carga de
+// personal: una fila por cada bono que tenga el trabajador, no por trabajador.
+// ---------------------------------------------------------------------------
+
+/** Código de agrupación SIGPER para cada tipo de bono. */
+export const SIGPER_CODIGO_AGRUPACION = {
+  colacion: 'ALIMENTAC',
+  movilizacion: 'MOVILIZAC',
+} as const;
+
+export const SIGPER_ENCABEZADOS_BONOS = [
+  'RUN funcionario',
+  'Código agrupación',
+  'Fecha cumplimiento',
+  'Fecha de inicio',
+  'Fecha de término',
+  'Factor',
+  'Observaciones',
+  'Fecha Inicio Prox. Pago',
+  'Ind. de Reingreso',
+  'Porcentaje A.F.C',
+];
+
+/** Hoja "ESTRUCTURA" del voucher de bonos, copiada de la plantilla oficial de SIGPER. */
+export const SIGPER_ESTRUCTURA_BONOS: [string, string, string][] = [
+  ['CAMPO', 'TIPO DE DATO', 'OBSERVACIONES'],
+  ['RUN funcionario', 'Numerico(9)', ''],
+  ['Código agrupación', 'Caracter(11)', 'Segun Tabla "Agrupación de Formula"'],
+  ['Fecha cumplimiento', 'D(8)', 'DD-MM-YYYY, solo para agrupación de BIENIOS'],
+  ['Fecha de inicio', 'D(8)', 'DD-MM-YYYY'],
+  ['Fecha de término', 'D(8)', 'DD-MM-YYYY'],
+  ['Factor ', '(TEXTO) Numerico. Decimal(12.4)', ''],
+  ['Observaciones', 'Caracter(255)', ''],
+  ['Fecha Pago Prox. Bienio', 'D(8)', 'DD-MM-YYYY'],
+  ['Ind. de Reingreso', 'Caracter(1)', 'Debe ser N'],
+  ['Porcentaje A.F.C', 'Numerico, Decimal(6,2)', 'Solo si agrupación es AFC'],
 ];

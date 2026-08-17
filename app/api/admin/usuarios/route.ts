@@ -45,7 +45,10 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { email, role } = await request.json();
-    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
+    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: { force_password_change: true },
+      redirectTo: `${new URL(request.url).origin}/api/auth/callback?next=/actualizar-password`,
+    });
 
     if (error) throw error;
 
