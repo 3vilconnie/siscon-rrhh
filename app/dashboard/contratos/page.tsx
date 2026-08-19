@@ -25,6 +25,8 @@ import {
   ESTADOS_CIVILES,
   AFP_OPCIONES,
   SALUD_OPCIONES,
+  CONTROL_ASISTENCIA,
+  fraseControlAsistencia,
   estadoCivilLabel,
   estadoCivilIdDesdeLabel,
   construirDatosContrato,
@@ -72,6 +74,7 @@ export default function ModuloContratos() {
   const [labores, setLabores] = useState('');
   const [lugarTrabajo, setLugarTrabajo] = useState('');
   const [dependenciaDir, setDependenciaDir] = useState('');
+  const [controlAsistencia, setControlAsistencia] = useState<string>('biometrico');
   const [prevision, setPrevision] = useState('AFP Uno');
   const [salud, setSalud] = useState('FONASA');
   const [incluirBonos, setIncluirBonos] = useState(false);
@@ -137,6 +140,7 @@ export default function ModuloContratos() {
     setLugarTrabajo(p.lugar_trabajo ?? '');
     setDependenciaDir(p.dependencia_dir ?? '');
     setJornada(p.jornada ?? 44);
+    setControlAsistencia(p.control_asistencia ?? 'biometrico');
     setIncluirBonos(p.incluir_bonos);
     setBonoMov(p.bono_movilizacion);
     setBonoCol(p.bono_colacion);
@@ -172,6 +176,7 @@ export default function ModuloContratos() {
     setLabores(c?.labores ?? '');
     setLugarTrabajo(c?.lugar_trabajo ?? '');
     setDependenciaDir(c?.dependencia_dir ?? '');
+    setControlAsistencia(c?.control_asistencia ?? 'biometrico');
     if (c?.programa && PROGRAMAS_CONTRATO.some((p) => p.id === c.programa)) {
       setProgramaId(c.programa);
     }
@@ -253,6 +258,7 @@ export default function ModuloContratos() {
         labores,
         lugarTrabajo,
         dependenciaDir,
+        controlAsistencia,
         prevision,
         salud,
         bonoMovilizacion: incluirBonos ? bonoMov : 0,
@@ -286,6 +292,7 @@ export default function ModuloContratos() {
     labores,
     lugarTrabajo,
     dependenciaDir,
+    controlAsistencia,
     prevision,
     salud,
     incluirBonos,
@@ -354,6 +361,7 @@ export default function ModuloContratos() {
       labores: labores || null,
       lugar_trabajo: lugarTrabajo || null,
       dependencia_dir: dependenciaDir || null,
+      control_asistencia: controlAsistencia,
       programa: programaId || null,
       bono_movilizacion: incluirBonos ? bonoMov : 0,
       bono_colacion: incluirBonos ? bonoCol : 0,
@@ -793,6 +801,26 @@ export default function ModuloContratos() {
                         onChange={(e) => setDependenciaDir(e.target.value)}
                         placeholder="Ej: la coordinadora del proyecto ..."
                       />
+                    </Col>
+                    <Col xs={12}>
+                      {label('Control de asistencia')}
+                      <div className="d-flex flex-wrap gap-4">
+                        {CONTROL_ASISTENCIA.map((opcion) => (
+                          <Form.Check
+                            key={opcion.id}
+                            type="radio"
+                            id={`control-asistencia-${opcion.id}`}
+                            name="controlAsistencia"
+                            label={opcion.etiqueta}
+                            checked={controlAsistencia === opcion.id}
+                            onChange={() => setControlAsistencia(opcion.id)}
+                          />
+                        ))}
+                      </div>
+                      <Form.Text className="text-muted">
+                        En el contrato se redactará: «...a través de{' '}
+                        {fraseControlAsistencia(controlAsistencia)}.»
+                      </Form.Text>
                     </Col>
                     <Col xs={6} md={2}>
                       {label('Jornada (h)')}

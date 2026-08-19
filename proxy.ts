@@ -51,7 +51,9 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isAdminPageRoute || isApiAdminRoute) {
-    const userRole = user?.user_metadata?.role || 'user';
+    // El rol vive en app_metadata: solo el service role puede escribirlo, así
+    // un usuario no puede auto-asignarse "admin" desde el cliente.
+    const userRole = user?.app_metadata?.role || 'user';
 
     if (userRole !== 'admin') {
       if (isApiAdminRoute) {

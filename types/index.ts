@@ -16,6 +16,8 @@ export interface Contrato {
   count?: number;
   tipo?: 'contrato' | 'anexo';
   contrato_origen_id?: string | null;
+  /** 'biometrico' | 'libro' — método de control de asistencia (cláusula SEGUNDO). */
+  control_asistencia?: string;
 }
 
 export interface Trabajador {
@@ -47,6 +49,7 @@ export interface PlantillaContrato {
   lugar_trabajo: string | null;
   dependencia_dir: string | null;
   jornada: number | null;
+  control_asistencia?: string;
   incluir_bonos: boolean;
   bono_movilizacion: number;
   bono_colacion: number;
@@ -69,7 +72,13 @@ export interface AlertaNotificacion {
 export interface Usuario {
   id: string;
   email: string;
-  app_metadata: { role?: string };
+  /** Solo escribible con service role: el usuario no puede alterarlo desde el cliente. */
+  app_metadata: {
+    role?: string;
+    /** RUT del trabajador asociado (sin DV); lo asigna un administrador. */
+    rut?: number;
+  };
+  user_metadata?: { full_name?: string };
   banned_until?: string | null;
   created_at: string;
 }

@@ -138,7 +138,7 @@ export default function NominatrabajadoresPage() {
   };
 
   return (
-    <div className="container-fluid">
+    <div className="container-fluid col-10">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="fw-bold text-dark m-0">Nómina de Trabajadores</h2>

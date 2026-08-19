@@ -6,7 +6,7 @@ import { Card, Row, Col, Form, Button, Table, Badge, Modal, Spinner } from 'reac
 import { supabase } from '@/lib/supabase';
 import { registrarAuditoria, ACCIONES } from '@/lib/auditoria';
 import { PlantillaContrato } from '@/types';
-import { PROGRAMAS_CONTRATO } from '@/lib/contrato';
+import { PROGRAMAS_CONTRATO, CONTROL_ASISTENCIA, fraseControlAsistencia } from '@/lib/contrato';
 
 type FormPlantilla = {
   nombre: string;
@@ -14,6 +14,7 @@ type FormPlantilla = {
   labores: string;
   lugarTrabajo: string;
   dependenciaDir: string;
+  controlAsistencia: string;
   jornada: number;
   incluirBonos: boolean;
   bonoMovilizacion: number;
@@ -29,6 +30,7 @@ const FORM_VACIO: FormPlantilla = {
   labores: '',
   lugarTrabajo: '',
   dependenciaDir: '',
+  controlAsistencia: 'biometrico',
   jornada: 44,
   incluirBonos: false,
   bonoMovilizacion: 0,
@@ -84,6 +86,7 @@ export default function PlantillasContratoPage() {
       labores: p.labores ?? '',
       lugarTrabajo: p.lugar_trabajo ?? '',
       dependenciaDir: p.dependencia_dir ?? '',
+      controlAsistencia: p.control_asistencia ?? 'biometrico',
       jornada: p.jornada ?? 44,
       incluirBonos: p.incluir_bonos,
       bonoMovilizacion: p.bono_movilizacion,
@@ -114,6 +117,7 @@ export default function PlantillasContratoPage() {
         labores: form.labores || null,
         lugar_trabajo: form.lugarTrabajo || null,
         dependencia_dir: form.dependenciaDir || null,
+        control_asistencia: form.controlAsistencia,
         jornada: form.jornada || null,
         incluir_bonos: form.incluirBonos,
         bono_movilizacion: form.incluirBonos ? form.bonoMovilizacion : 0,
@@ -356,6 +360,25 @@ export default function PlantillasContratoPage() {
                   value={form.jornada}
                   onChange={(e) => setForm({ ...form, jornada: Number(e.target.value) || 0 })}
                 />
+              </Col>
+              <Col md={8}>
+                {label('Control de asistencia')}
+                <div className="d-flex flex-wrap gap-4">
+                  {CONTROL_ASISTENCIA.map((opcion) => (
+                    <Form.Check
+                      key={opcion.id}
+                      type="radio"
+                      id={`control-asistencia-plantilla-${opcion.id}`}
+                      name="controlAsistenciaPlantilla"
+                      label={opcion.etiqueta}
+                      checked={form.controlAsistencia === opcion.id}
+                      onChange={() => setForm({ ...form, controlAsistencia: opcion.id })}
+                    />
+                  ))}
+                </div>
+                <Form.Text className="text-muted" style={{ fontSize: '0.72rem' }}>
+                  «...a través de {fraseControlAsistencia(form.controlAsistencia)}.»
+                </Form.Text>
               </Col>
 
               <Col md={12}>

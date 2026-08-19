@@ -30,6 +30,8 @@ import {
   ESTADOS_CIVILES,
   AFP_OPCIONES,
   SALUD_OPCIONES,
+  CONTROL_ASISTENCIA,
+  fraseControlAsistencia,
   SIGPER_CONSTANTES,
   SIGPER_PROGRAMAS,
   SIGPER_TIPO_TRABAJADOR,
@@ -130,6 +132,7 @@ export default function ContratosMasivosPage() {
     labores: '',
     lugarTrabajo: '',
     dependenciaDirecta: '',
+    controlAsistencia: 'biometrico' as string,
     jornada: 44,
     prevision: 'AFP Uno',
     salud: 'FONASA',
@@ -207,6 +210,7 @@ export default function ContratosMasivosPage() {
       labores: p.labores ?? '',
       lugarTrabajo: p.lugar_trabajo ?? '',
       dependenciaDirecta: p.dependencia_dir ?? '',
+      controlAsistencia: p.control_asistencia ?? 'biometrico',
       jornada: p.jornada ?? prev.jornada,
       incluirBonos: p.incluir_bonos,
       bonoMovilizacion: p.bono_movilizacion,
@@ -463,6 +467,7 @@ export default function ContratosMasivosPage() {
         labores: config.labores,
         lugarTrabajo: config.lugarTrabajo,
         dependenciaDir: config.dependenciaDirecta,
+        controlAsistencia: config.controlAsistencia,
         prevision: ov?.prevision ?? t.prevision ?? config.prevision,
         salud: ov?.salud ?? t.salud ?? config.salud,
         bonoMovilizacion: config.incluirBonos ? config.bonoMovilizacion : 0,
@@ -525,6 +530,7 @@ export default function ContratosMasivosPage() {
         labores: config.labores || null,
         lugar_trabajo: config.lugarTrabajo || null,
         dependencia_dir: config.dependenciaDirecta || null,
+        control_asistencia: config.controlAsistencia,
         programa: config.programaId || null,
         bono_movilizacion: config.incluirBonos ? config.bonoMovilizacion : 0,
         bono_colacion: config.incluirBonos ? config.bonoColacion : 0,
@@ -1324,6 +1330,30 @@ export default function ContratosMasivosPage() {
                               handleConfigChange('dependenciaDirecta', e.target.value)
                             }
                           />
+                        </Form.Group>
+                      </Col>
+                      <Col md={12}>
+                        <Form.Group>
+                          <Form.Label className="fw-semibold text-secondary small mb-1">
+                            Control de asistencia
+                          </Form.Label>
+                          <div className="d-flex flex-wrap gap-4">
+                            {CONTROL_ASISTENCIA.map((opcion) => (
+                              <Form.Check
+                                key={opcion.id}
+                                type="radio"
+                                id={`control-asistencia-masivo-${opcion.id}`}
+                                name="controlAsistenciaMasivo"
+                                label={opcion.etiqueta}
+                                checked={config.controlAsistencia === opcion.id}
+                                onChange={() => handleConfigChange('controlAsistencia', opcion.id)}
+                              />
+                            ))}
+                          </div>
+                          <Form.Text className="text-muted">
+                            En el contrato se redactará: «...a través de{' '}
+                            {fraseControlAsistencia(config.controlAsistencia)}.»
+                          </Form.Text>
                         </Form.Group>
                       </Col>
                     </Row>

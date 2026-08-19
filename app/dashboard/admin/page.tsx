@@ -15,15 +15,9 @@ import {
   Alert,
   ListGroup,
 } from 'react-bootstrap';
-import { Trabajador } from '@/types';
-
-interface Usuario {
-  id: string;
-  email: string;
-  user_metadata: { role?: string };
-  banned_until?: string | null;
-  created_at: string;
-}
+import { supabase } from '@/lib/supabase';
+import { formatearRutFiniquito } from '@/lib/finiquito';
+import { Trabajador, Usuario } from '@/types';
 
 interface ParametrosSistema {
   ventana_meses: number;
@@ -62,11 +56,58 @@ export default function ConsolaAdministradorCompleta() {
   const [checkConsentimiento, setCheckConsentimiento] = useState(false); // UX para prevenir borrado accidental
   const [procesandoAccion, setProcesandoAccion] = useState(false);
 
+  // --- EDICIÓN DE USUARIO ---
+  const [modalEditar, setModalEditar] = useState(false);
+  const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
+  const [formEdicion, setFormEdicion] = useState({
+    email: '',
+    fullName: '',
+    role: 'usuario',
+    rut: '',
+  });
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+  const [errorEdicion, setErrorEdicion] = useState('');
+  /** Cache rut -> datos del trabajador, para mostrarlo en la tabla y el modal. */
+  const [trabajadoresPorRut, setTrabajadoresPorRut] = useState<
+    Record<number, { nombre: string; dv: string }>
+  >({});
+  const [buscandoTrabajador, setBuscandoTrabajador] = useState(false);
+
+  /** Carga los nombres de los trabajadores asociados a los usuarios, para mostrarlos en la tabla. */
+  const cargarTrabajadoresAsociados = async (lista: Usuario[]) => {
+    const ruts = lista
+      .map((u) => u.app_metadata?.rut)
+      .filter((r): r is number => typeof r === 'number');
+    if (ruts.length === 0) return;
+
+    const { data } = await supabase
+      .from('trabajadores')
+      .select('rut, dv, nombres, primer_apellido, segundo_apellido')
+      .in('rut', ruts);
+
+    if (data) {
+      const mapa: Record<number, { nombre: string; dv: string }> = {};
+      for (const t of data as Trabajador[]) {
+        mapa[t.rut] = {
+          nombre: `${t.nombres} ${t.primer_apellido} ${t.segundo_apellido ?? ''}`
+            .trim()
+            .toUpperCase(),
+          dv: t.dv,
+        };
+      }
+      setTrabajadoresPorRut((prev) => ({ ...prev, ...mapa }));
+    }
+  };
+
   const cargarDatosConsola = async () => {
     setLoading(true);
     try {
       const resUsers = await fetch('/api/admin/usuarios');
-      if (resUsers.ok) setUsuarios(await resUsers.json());
+      if (resUsers.ok) {
+        const lista: Usuario[] = await resUsers.json();
+        setUsuarios(lista);
+        await cargarTrabajadoresAsociados(lista);
+      }
 
       const resConfig = await fetch('/api/configuraciones');
       if (resConfig.ok) {
@@ -99,6 +140,83 @@ export default function ConsolaAdministradorCompleta() {
       if (res.ok) alert('¡Parámetros actualizados! ⚙️✨');
     } finally {
       setGuardandoParametros(false);
+    }
+  };
+
+  // --- EDICIÓN DE USUARIO ---
+  const abrirModalEditar = (u: Usuario) => {
+    setUsuarioEditando(u);
+    setErrorEdicion('');
+    setFormEdicion({
+      email: u.email ?? '',
+      fullName: u.user_metadata?.full_name ?? '',
+      role: u.app_metadata?.role ?? 'usuario',
+      rut: u.app_metadata?.rut ? String(u.app_metadata.rut) : '',
+    });
+    setModalEditar(true);
+  };
+
+  const cerrarModalEditar = () => {
+    setModalEditar(false);
+    setUsuarioEditando(null);
+    setErrorEdicion('');
+  };
+
+  /** Busca el trabajador mientras se escribe el RUT, para confirmar visualmente a quién se asocia. */
+  const handleRutChange = async (valor: string) => {
+    setFormEdicion((prev) => ({ ...prev, rut: valor }));
+    const rutNumero = parseInt(valor.replace(/\D/g, ''), 10);
+    if (!rutNumero || trabajadoresPorRut[rutNumero]) return;
+
+    setBuscandoTrabajador(true);
+    const { data } = await supabase
+      .from('trabajadores')
+      .select('rut, dv, nombres, primer_apellido, segundo_apellido')
+      .eq('rut', rutNumero)
+      .maybeSingle();
+    if (data) {
+      const t = data as Trabajador;
+      setTrabajadoresPorRut((prev) => ({
+        ...prev,
+        [t.rut]: {
+          nombre: `${t.nombres} ${t.primer_apellido} ${t.segundo_apellido ?? ''}`
+            .trim()
+            .toUpperCase(),
+          dv: t.dv,
+        },
+      }));
+    }
+    setBuscandoTrabajador(false);
+  };
+
+  const handleGuardarEdicion = async () => {
+    if (!usuarioEditando) return;
+    setGuardandoEdicion(true);
+    setErrorEdicion('');
+    try {
+      const res = await fetch('/api/admin/usuarios', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: usuarioEditando.id,
+          email: formEdicion.email.trim(),
+          fullName: formEdicion.fullName.trim(),
+          role: formEdicion.role,
+          rut: formEdicion.rut.trim() === '' ? null : formEdicion.rut.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Error desconocido.' }));
+        throw new Error(error);
+      }
+
+      cerrarModalEditar();
+      await cargarDatosConsola();
+    } catch (error) {
+      setErrorEdicion(error instanceof Error ? error.message : 'No se pudo guardar.');
+    } finally {
+      setGuardandoEdicion(false);
     }
   };
 
@@ -393,6 +511,7 @@ export default function ConsolaAdministradorCompleta() {
                 <thead className="table-light text-uppercase">
                   <tr>
                     <th className="px-3">Email</th>
+                    <th>Trabajador asociado</th>
                     <th>Rol</th>
                     <th>Estado</th>
                     <th className="text-end px-3">Gestión</th>
@@ -401,19 +520,39 @@ export default function ConsolaAdministradorCompleta() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={4} className="text-center py-4">
+                      <td colSpan={5} className="text-center py-4">
                         Cargando...
                       </td>
                     </tr>
                   ) : (
                     usuarios.map((u) => {
                       const suspendido = !!u.banned_until;
+                      const rutAsociado = u.app_metadata?.rut;
                       return (
                         <tr key={u.id} className={suspendido ? 'table-danger bg-opacity-25' : ''}>
                           <td className="px-3 fw-semibold">{u.email}</td>
                           <td>
-                            <Badge bg={u.user_metadata?.role === 'admin' ? 'danger' : 'secondary'}>
-                              {u.user_metadata?.role || 'USER'}
+                            {rutAsociado ? (
+                              <div className="small">
+                                <div className="fw-semibold text-dark">
+                                  {trabajadoresPorRut[rutAsociado]?.nombre ?? '—'}
+                                </div>
+                                <span className="text-muted font-monospace">
+                                  {trabajadoresPorRut[rutAsociado]
+                                    ? formatearRutFiniquito(
+                                        rutAsociado,
+                                        trabajadoresPorRut[rutAsociado].dv,
+                                      )
+                                    : rutAsociado}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-muted small">Sin asociar</span>
+                            )}
+                          </td>
+                          <td>
+                            <Badge bg={u.app_metadata?.role === 'admin' ? 'danger' : 'secondary'}>
+                              {u.app_metadata?.role || 'usuario'}
                             </Badge>
                           </td>
                           <td>
@@ -424,6 +563,15 @@ export default function ConsolaAdministradorCompleta() {
                             )}
                           </td>
                           <td className="text-end px-3">
+                            <Button
+                              size="sm"
+                              variant="outline-primary"
+                              onClick={() => abrirModalEditar(u)}
+                              className="py-1 px-2 me-2 fw-bold"
+                              title="Editar datos del usuario"
+                            >
+                              <i className="bi bi-pencil-square"></i>
+                            </Button>
                             <Button
                               size="sm"
                               variant={suspendido ? 'success' : 'outline-warning'}
@@ -484,6 +632,111 @@ export default function ConsolaAdministradorCompleta() {
           </Card>
         </Col>
       </Row>
+
+      {/* --- MODAL: EDITAR USUARIO --- */}
+      <Modal show={modalEditar} onHide={cerrarModalEditar} centered backdrop="static">
+        <Modal.Header closeButton className="bg-primary text-white border-bottom-0">
+          <Modal.Title className="fw-bold fs-5">
+            <i className="bi bi-person-gear me-2"></i>Editar Usuario
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-4">
+          {errorEdicion && (
+            <Alert variant="danger" className="py-2 small">
+              {errorEdicion}
+            </Alert>
+          )}
+          <Form>
+            <Form.Group className="mb-3">
+              <Form.Label className="small fw-bold text-secondary">Correo electrónico</Form.Label>
+              <Form.Control
+                type="email"
+                value={formEdicion.email}
+                onChange={(e) => setFormEdicion({ ...formEdicion, email: e.target.value })}
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label className="small fw-bold text-secondary">Nombre para mostrar</Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="Ej: Constanza Ramos"
+                value={formEdicion.fullName}
+                onChange={(e) => setFormEdicion({ ...formEdicion, fullName: e.target.value })}
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label className="small fw-bold text-secondary">Rol</Form.Label>
+              <Form.Select
+                value={formEdicion.role}
+                onChange={(e) => setFormEdicion({ ...formEdicion, role: e.target.value })}
+              >
+                <option value="usuario">Usuario</option>
+                <option value="admin">Administrador</option>
+              </Form.Select>
+            </Form.Group>
+
+            <Form.Group>
+              <Form.Label className="small fw-bold text-secondary">
+                RUT del trabajador asociado
+              </Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="Sin dígito verificador. Ej: 12345678"
+                value={formEdicion.rut}
+                onChange={(e) => handleRutChange(e.target.value)}
+              />
+              {(() => {
+                const rutNum = parseInt(formEdicion.rut.replace(/\D/g, ''), 10);
+                if (!formEdicion.rut.trim()) {
+                  return (
+                    <Form.Text className="text-muted">
+                      Déjalo vacío para desasociar al usuario de su ficha de trabajador.
+                    </Form.Text>
+                  );
+                }
+                if (buscandoTrabajador) {
+                  return <Form.Text className="text-muted">Buscando trabajador...</Form.Text>;
+                }
+                if (rutNum && trabajadoresPorRut[rutNum]) {
+                  return (
+                    <Form.Text className="text-success fw-semibold">
+                      <i className="bi bi-check-circle me-1"></i>
+                      {trabajadoresPorRut[rutNum].nombre} (
+                      {formatearRutFiniquito(rutNum, trabajadoresPorRut[rutNum].dv)})
+                    </Form.Text>
+                  );
+                }
+                return (
+                  <Form.Text className="text-warning">
+                    <i className="bi bi-exclamation-triangle me-1"></i>
+                    No se encontró un trabajador con ese RUT.
+                  </Form.Text>
+                );
+              })()}
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer className="border-top-0 pt-0">
+          <Button
+            variant="outline-secondary"
+            onClick={cerrarModalEditar}
+            className="fw-semibold"
+            disabled={guardandoEdicion}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleGuardarEdicion}
+            className="fw-semibold shadow-sm"
+            disabled={guardandoEdicion}
+          >
+            {guardandoEdicion ? 'Guardando...' : 'Guardar Cambios'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       {/* --- MODAL DE SEGURIDAD (react-bootstrap) --- */}
       <Modal

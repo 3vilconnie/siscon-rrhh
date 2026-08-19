@@ -101,6 +101,8 @@ export interface EntradaContrato {
   labores: string;
   lugarTrabajo: string;
   dependenciaDir: string;
+  /** 'biometrico' | 'libro'; si se omite, se usa reloj biométrico. */
+  controlAsistencia?: string;
   prevision: string;
   salud: string;
   bonoMovilizacion: number;
@@ -152,6 +154,8 @@ export interface DatosContrato {
     labores: string;
     lugar_trabajo: string;
     dependencia_dir: string;
+    /** Frase ya resuelta: "reloj biométrico geovictoria box" o "libro de asistencia para este efecto". */
+    control_asistencia: string;
     sueldo_texto: string; // 640.000
     sueldo_palabras: string; // SEISCIENTOS CUARENTA MIL PESOS
     prevision: string;
@@ -184,6 +188,31 @@ function textosGenero(genero?: string): DatosContrato['g'] {
     del_trabajador: f ? 'de la trabajadora' : 'del trabajador',
     al_trabajador: f ? 'a la trabajadora' : 'al trabajador',
   };
+}
+
+/**
+ * Método de control de asistencia (cláusula SEGUNDO). Se guarda el `id` en la
+ * base y la `frase` es lo que finalmente se imprime en el documento, para que
+ * un cambio de redacción no obligue a migrar datos.
+ */
+export const CONTROL_ASISTENCIA = [
+  {
+    id: 'biometrico',
+    etiqueta: 'Reloj biométrico',
+    frase: 'reloj biométrico geovictoria box',
+  },
+  {
+    id: 'libro',
+    etiqueta: 'Libro de asistencia',
+    frase: 'libro de asistencia para este efecto',
+  },
+] as const;
+
+export type ControlAsistencia = (typeof CONTROL_ASISTENCIA)[number]['id'];
+
+/** Frase que se imprime en el contrato; cae en reloj biométrico si el id no es válido. */
+export function fraseControlAsistencia(id?: string | null): string {
+  return (CONTROL_ASISTENCIA.find((c) => c.id === id) ?? CONTROL_ASISTENCIA[0]).frase;
 }
 
 /** Catálogo único de AFP, usado en todos los formularios que piden "Previsión". */
@@ -295,6 +324,7 @@ export function construirDatosContrato(
       labores: entrada.labores,
       lugar_trabajo: entrada.lugarTrabajo,
       dependencia_dir: entrada.dependenciaDir,
+      control_asistencia: fraseControlAsistencia(entrada.controlAsistencia),
       sueldo_texto: formatearMiles(entrada.sueldo || 0),
       sueldo_palabras: montoEnPalabras(entrada.sueldo || 0),
       prevision: entrada.prevision,
@@ -481,6 +511,10 @@ export const CAMPOS_CONTRATO: CampoContrato[] = [
   { marcador: '{d.contrato.labores}', descripcion: 'Labores' },
   { marcador: '{d.contrato.lugar_trabajo}', descripcion: 'Lugar de trabajo (comuna)' },
   { marcador: '{d.contrato.dependencia_dir}', descripcion: 'Dependencia directa' },
+  {
+    marcador: '{d.contrato.control_asistencia}',
+    descripcion: 'Control de asistencia (reloj biométrico / libro)',
+  },
   { marcador: '{d.contrato.sueldo_texto}', descripcion: 'Sueldo (número con miles)' },
   { marcador: '{d.contrato.sueldo_palabras}', descripcion: 'Sueldo en palabras' },
   { marcador: '{d.contrato.prevision}', descripcion: 'Régimen previsional (AFP)' },

@@ -7,12 +7,14 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast, { Toaster } from 'react-hot-toast';
 import { Card, Form, Button, InputGroup, Spinner } from 'react-bootstrap';
+import type { EmailOtpType, User } from '@supabase/supabase-js';
 
 type Estado = 'verificando' | 'sin_sesion' | 'listo';
 
 export default function ActualizarPasswordPage() {
   const [estado, setEstado] = useState<Estado>('verificando');
   const [esObligatorio, setEsObligatorio] = useState(false);
+  const [mensajeError, setMensajeError] = useState('');
 
   const [nuevaPassword, setNuevaPassword] = useState('');
   const [confirmarPassword, setConfirmarPassword] = useState('');
@@ -20,20 +22,77 @@ export default function ActualizarPasswordPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // Los enlaces de correo llegan en tres formatos distintos según el flujo:
+  //  · recuperación (PKCE): la sesión ya viene establecida por /api/auth/callback
+  //  · invitación: la sesión viene en el fragmento (#access_token=...), que
+  //    supabase-js procesa de forma asíncrona al cargar la página
+  //  · plantillas con token_hash: hay que canjearlo con verifyOtp
+  // Se contemplan los tres para no rechazar un enlace válido.
   useEffect(() => {
-    (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+    let activo = true;
 
-      if (!user) {
-        setEstado('sin_sesion');
+    const marcarListo = (user: User) => {
+      if (!activo) return;
+      setEsObligatorio(!!user.user_metadata?.force_password_change);
+      setEstado('listo');
+    };
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_evento, session) => {
+      if (session?.user) marcarListo(session.user);
+    });
+
+    const iniciar = async () => {
+      const query = new URLSearchParams(window.location.search);
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+
+      // Supabase informa los errores por query o por fragmento según el caso.
+      const descripcionError = query.get('error_description') ?? hash.get('error_description');
+      if (descripcionError) {
+        if (activo) {
+          setMensajeError(descripcionError);
+          setEstado('sin_sesion');
+        }
         return;
       }
 
-      setEsObligatorio(!!user.user_metadata?.force_password_change);
-      setEstado('listo');
-    })();
+      const tokenHash = query.get('token_hash');
+      const tipo = query.get('type');
+      if (tokenHash && tipo) {
+        const { data, error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: tipo as EmailOtpType,
+        });
+        if (!activo) return;
+        if (error || !data.user) {
+          setMensajeError(error?.message ?? '');
+          setEstado('sin_sesion');
+          return;
+        }
+        marcarListo(data.user);
+        return;
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user) marcarListo(session.user);
+      // Si aún no hay sesión, puede estar procesándose el fragmento: lo resuelve
+      // onAuthStateChange, o el temporizador de abajo si el enlace no era válido.
+    };
+
+    iniciar();
+
+    const tiempoLimite = setTimeout(() => {
+      if (activo) setEstado((prev) => (prev === 'verificando' ? 'sin_sesion' : prev));
+    }, 5000);
+
+    return () => {
+      activo = false;
+      clearTimeout(tiempoLimite);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleUpdate = async (e: React.FormEvent) => {
@@ -91,6 +150,11 @@ export default function ActualizarPasswordPage() {
           <p className="text-muted small mt-2">
             El enlace ya no es válido. Solicita uno nuevo desde la pantalla de inicio de sesión.
           </p>
+          {mensajeError && (
+            <p className="text-muted small fst-italic border-top pt-2 mt-2 mb-2">
+              Detalle: {mensajeError}
+            </p>
+          )}
           <Link href="/login" className="btn btn-primary fw-semibold mt-2">
             Volver a Iniciar Sesión
           </Link>

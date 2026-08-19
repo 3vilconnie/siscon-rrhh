@@ -1,7 +1,7 @@
 // app/dashboard/layout.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Spinner } from 'react-bootstrap';
@@ -12,63 +12,62 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
 
   const [nombreUsuario, setNombreUsuario] = useState<string>('Cargando...');
+  const [emailUsuario, setEmailUsuario] = useState<string>('');
   const [ultimaConexion, setUltimaConexion] = useState<string>('');
   const [rolUsuario, setRolUsuario] = useState<string>('usuario');
+  const [rutAsociado, setRutAsociado] = useState<number | null>(null);
   const [autorizando, setAutorizando] = useState<boolean>(true);
 
-  useEffect(() => {
-    let montado = true;
+  // Se expone como callback para poder recargar los datos después de que el
+  // usuario edite su propio perfil desde el navbar.
+  const cargarDatosUsuario = useCallback(async () => {
+    try {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
 
-    async function obtenerDatosUsuario() {
-      try {
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser();
-
-        if (error || !user) {
-          if (montado) router.replace('/login');
-          return;
-        }
-
-        if (user.user_metadata?.force_password_change) {
-          if (montado) router.replace('/actualizar-password');
-          return;
-        }
-
-        if (montado) {
-          const nombre =
-            user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'Usuario';
-          setNombreUsuario(nombre);
-          setRolUsuario(user.user_metadata?.role || 'usuario');
-
-          if (user.last_sign_in_at) {
-            const fecha = new Date(user.last_sign_in_at);
-            setUltimaConexion(
-              fecha.toLocaleString('es-CL', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              }),
-            );
-          } else {
-            setUltimaConexion('No registrada');
-          }
-          setAutorizando(false);
-        }
-      } catch (err) {
-        console.error('Fallo en la verificación del layout:', err);
-        if (montado) router.replace('/login');
+      if (error || !user) {
+        router.replace('/login');
+        return;
       }
-    }
 
-    obtenerDatosUsuario();
-    return () => {
-      montado = false;
-    };
+      if (user.user_metadata?.force_password_change) {
+        router.replace('/actualizar-password');
+        return;
+      }
+
+      const nombre =
+        user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'Usuario';
+      setNombreUsuario(nombre);
+      setEmailUsuario(user.email ?? '');
+      setRolUsuario(user.app_metadata?.role || 'usuario');
+      setRutAsociado(typeof user.app_metadata?.rut === 'number' ? user.app_metadata.rut : null);
+
+      if (user.last_sign_in_at) {
+        const fecha = new Date(user.last_sign_in_at);
+        setUltimaConexion(
+          fecha.toLocaleString('es-CL', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        );
+      } else {
+        setUltimaConexion('No registrada');
+      }
+      setAutorizando(false);
+    } catch (err) {
+      console.error('Fallo en la verificación del layout:', err);
+      router.replace('/login');
+    }
   }, [router]);
+
+  useEffect(() => {
+    cargarDatosUsuario();
+  }, [cargarDatosUsuario]);
 
   const handleCerrarSesion = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -98,9 +97,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* BARRA SUPERIOR CON NAVEGACIÓN Y USUARIO */}
         <NavbarSuperior
           nombreUsuario={nombreUsuario}
+          emailUsuario={emailUsuario}
           ultimaConexion={ultimaConexion}
           rolUsuario={rolUsuario}
+          rutAsociado={rutAsociado}
           onCerrarSesion={handleCerrarSesion}
+          onPerfilActualizado={cargarDatosUsuario}
         />
 
         {/* ÁREA DE CONTENIDO */}
