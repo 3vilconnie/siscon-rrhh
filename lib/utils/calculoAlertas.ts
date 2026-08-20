@@ -1,102 +1,247 @@
 // lib/utils/calculoAlertas.ts
-import { Trabajador } from '@/types';
+//
+// Presunción de contrato indefinido del artículo 159 N°4, inciso quinto, del
+// Código del Trabajo: norma anti-fraude que impide encadenar contratos a plazo
+// fijo con interrupciones breves para no reconocer antigüedad.
+//
+// Los CUATRO requisitos son COPULATIVOS: deben cumplirse todos a la vez.
+//   1. Más de dos contratos          → al menos 3 contratos con el mismo empleador
+//   2. Servicios discontinuos        → debe existir al menos una brecha entre ellos
+//   3. 12 meses o más acumulados     → suma de la duración efectiva trabajada
+//   4. Dentro de 15 meses corridos   → contados desde el primer día del primer contrato
+//
+// Ejemplo de la norma (se usa como caso de prueba):
+//   C1 01-ene → 30-abr (4 m) · pausa mayo · C2 01-jun → 30-sep (4 m) ·
+//   pausa octubre · C3 01-nov → 28-feb (4 m)
+//   ⇒ 3 contratos discontinuos, 12 meses trabajados, lapso total 14 meses
+//   ⇒ el contrato 3 se convierte en indefinido de pleno derecho.
+
+import { Trabajador, Contrato } from '@/types';
+
+/** Días de un mes comercial, igual criterio que el cálculo de finiquito. */
+const DIAS_MES = 30;
+
+/**
+ * Margen para avisar ANTES de que se gatille la presunción. Un trabajador con
+ * los demás requisitos y esta cantidad de meses acumulados aparece como
+ * "próxima" para poder decidir la renovación antes de que sea irreversible.
+ */
+const MARGEN_PREVENTIVO_MESES = 2;
 
 export interface ConfigAlertas {
+  /** Marco temporal dentro del cual deben caber los servicios (15 por ley). */
   ventana_meses?: number;
-  enfriamiento_meses?: number;
+  /** Meses de servicio acumulados que gatillan la presunción (12 por ley). */
+  meses_acumulados?: number;
+  /** Contratos mínimos ("más de dos" ⇒ 3 por ley). */
   minimo_contratos?: number;
 }
 
-export function evaluarAlertaContinuidad(
-  trabajador: Trabajador,
-  config: ConfigAlertas = {},
-  fechaReferencia: Date = new Date(),
-) {
-  const ventana = config.ventana_meses ?? 15;
-  const enfriamiento = config.enfriamiento_meses ?? 3;
-  const minContratos = config.minimo_contratos ?? 2;
+export type NivelAlerta = 'ninguna' | 'proxima' | 'critica';
 
-  if (!trabajador.contratos || trabajador.contratos.length < minContratos) {
-    return { califica: false, totalContratos: 0 };
-  }
+export interface RequisitosArt159 {
+  /** 1. Al menos `minimo_contratos` contratos. */
+  contratos: boolean;
+  /** 2. Existe al menos una interrupción entre contratos. */
+  discontinuo: boolean;
+  /** 3. Suma de servicios ≥ `meses_acumulados`. */
+  acumulado: boolean;
+  /** 4. El conjunto cabe dentro de `ventana_meses`. */
+  ventana: boolean;
+}
 
-  const limiteTiempoAtras = new Date(fechaReferencia);
-  limiteTiempoAtras.setMonth(limiteTiempoAtras.getMonth() - ventana);
+export interface ResultadoAlerta {
+  /** true si hay alerta (crítica o próxima). */
+  califica: boolean;
+  nivel: NivelAlerta;
+  /** Contratos del grupo evaluado (los que caen en la ventana). */
+  totalContratos: number;
+  /** Meses de servicio efectivamente trabajados, sumados. */
+  mesesTrabajados: number;
+  /** Lapso total del grupo, del primer inicio al último término. */
+  mesesVentana: number;
+  esDiscontinuo: boolean;
+  tieneVigente: boolean;
+  /** Fecha desde la cual un nuevo contrato abre una ventana nueva. */
+  fechaSugerida: string;
+  requisitos: RequisitosArt159;
+}
 
-  // 1. Filtrar y ordenar contratos cronológicamente
-  const contratosVentana = trabajador.contratos
-    .filter((c) => new Date(c.fecha_inicio) >= limiteTiempoAtras)
-    .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime());
+const SIN_ALERTA: ResultadoAlerta = {
+  califica: false,
+  nivel: 'ninguna',
+  totalContratos: 0,
+  mesesTrabajados: 0,
+  mesesVentana: 0,
+  esDiscontinuo: false,
+  tieneVigente: false,
+  fechaSugerida: '',
+  requisitos: { contratos: false, discontinuo: false, acumulado: false, ventana: false },
+};
 
-  // 2. Validar vigencia laboral actual
-  const tieneContratoActivo = contratosVentana.some((c) => {
-    if (!c.fecha_termino) return true;
-    const fTermino = new Date(c.fecha_termino);
-    fTermino.setHours(0, 0, 0, 0);
-    const hoySinHoras = new Date(fechaReferencia);
-    hoySinHoras.setHours(0, 0, 0, 0);
-    return fTermino >= hoySinHoras;
-  });
+/** Fecha ISO (YYYY-MM-DD) a Date UTC, sin desfase de zona horaria. */
+function aUTC(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
 
-  // 3. Evaluar la RACHA ACTUAL con cálculo calendario
-  let rachaActual = 0;
+function sumarMeses(fecha: Date, meses: number): Date {
+  const r = new Date(fecha.getTime());
+  r.setUTCMonth(r.getUTCMonth() + meses);
+  return r;
+}
 
-  if (contratosVentana.length > 0) {
-    rachaActual = 1;
+function diasEntre(desde: Date, hasta: Date): number {
+  return Math.round((hasta.getTime() - desde.getTime()) / 86400000);
+}
 
-    for (let i = 1; i < contratosVentana.length; i++) {
-      const contratoPrevio = contratosVentana[i - 1];
-      const contratoActual = contratosVentana[i];
+function formatearFecha(d: Date): string {
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${dd}-${mm}-${d.getUTCFullYear()}`;
+}
 
-      if (contratoPrevio.fecha_termino) {
-        const dPrevio = new Date(contratoPrevio.fecha_termino);
-        const dActual = new Date(contratoActual.fecha_inicio);
+interface ContratoNormalizado {
+  inicio: Date;
+  /** Término efectivo: el pactado o, si sigue vigente, la fecha de referencia. */
+  termino: Date;
+  vigente: boolean;
+}
 
-        // CÁLCULO CALENDARIO: Diferencia de meses reales considerando años
-        // Ej: (2026 - 2025) * 12 + (Abril(3) - Diciembre(11)) = 12 + (-8) = 4 meses de diferencia entre inicios de mes
-        let mesesDiferencia =
-          (dActual.getFullYear() - dPrevio.getFullYear()) * 12 +
-          (dActual.getMonth() - dPrevio.getMonth());
+/**
+ * Evalúa un grupo de contratos consecutivos como candidato a gatillar la
+ * presunción. Devuelve las métricas de los 4 requisitos.
+ */
+function evaluarGrupo(
+  grupo: ContratoNormalizado[],
+  cfg: Required<ConfigAlertas>,
+): { meses: number; lapso: number; discontinuo: boolean; requisitos: RequisitosArt159 } {
+  // Requisito 3: duración efectiva sumada (días inclusivos → meses comerciales).
+  const dias = grupo.reduce((acc, c) => acc + diasEntre(c.inicio, c.termino) + 1, 0);
+  const meses = dias / DIAS_MES;
 
-        // Ajuste fino: Si el contrato actual empezó a principio de mes, pero el anterior terminó a fin de mes,
-        // la resta matemática de los meses da 1 menos del tiempo real "fuera".
-        // Ej: 31-12 a 01-04 -> mesesDiferencia = 4.
-        // Si dActual.getDate() es 1, estuvo todo el mes previo fuera.
+  // Requisito 4: lapso total, del primer inicio al último término.
+  const lapsoDias = diasEntre(grupo[0].inicio, grupo[grupo.length - 1].termino) + 1;
+  const lapso = lapsoDias / DIAS_MES;
 
-        // Para asegurar que el enfriamiento se cumpla, evaluamos si mesesDiferencia >= enfriamiento
-        if (mesesDiferencia < enfriamiento) {
-          rachaActual++;
-        } else {
-          // Ya cumplió el periodo de enfriamiento
-          rachaActual = 1;
-        }
-      } else {
-        rachaActual++;
-      }
-    }
-  }
-
-  // 4. Calcular fecha sugerida de término
-  let fechaSugerida = 'Revisar ficha';
-  if (rachaActual >= minContratos && tieneContratoActivo) {
-    const contratosConTermino = contratosVentana.filter((c) => c.fecha_termino);
-    if (contratosConTermino.length > 0) {
-      const ultimoTermino = new Date(
-        contratosConTermino[contratosConTermino.length - 1].fecha_termino!,
-      );
-      ultimoTermino.setMonth(ultimoTermino.getMonth() + enfriamiento);
-      fechaSugerida = ultimoTermino.toLocaleDateString('es-CL', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      });
+  // Requisito 2: al menos una interrupción real entre contratos sucesivos.
+  let discontinuo = false;
+  for (let i = 1; i < grupo.length; i++) {
+    if (diasEntre(grupo[i - 1].termino, grupo[i].inicio) - 1 > 0) {
+      discontinuo = true;
+      break;
     }
   }
 
   return {
-    califica: rachaActual >= minContratos && tieneContratoActivo,
-    totalContratos: rachaActual,
-    fechaSugerida,
-    tieneVigente: tieneContratoActivo,
+    meses,
+    lapso,
+    discontinuo,
+    requisitos: {
+      contratos: grupo.length >= cfg.minimo_contratos,
+      discontinuo,
+      acumulado: meses >= cfg.meses_acumulados,
+      ventana: lapso <= cfg.ventana_meses,
+    },
   };
+}
+
+/**
+ * Determina si un trabajador cae bajo la presunción del art. 159 N°4 inciso 5°.
+ *
+ * Recorre cada contrato como posible inicio de la ventana de 15 meses (no solo
+ * el primero de todos): un trabajador con historial largo puede tener un grupo
+ * que gatilla la norma años después del primer contrato.
+ */
+export function evaluarAlertaContinuidad(
+  trabajador: Trabajador,
+  config: ConfigAlertas = {},
+  fechaReferencia: Date = new Date(),
+): ResultadoAlerta {
+  const cfg: Required<ConfigAlertas> = {
+    ventana_meses: config.ventana_meses ?? 15,
+    meses_acumulados: config.meses_acumulados ?? 12,
+    minimo_contratos: config.minimo_contratos ?? 3,
+  };
+
+  const contratos: Contrato[] = trabajador.contratos ?? [];
+  if (contratos.length < cfg.minimo_contratos - 1) return SIN_ALERTA;
+
+  const hoy = new Date(
+    Date.UTC(
+      fechaReferencia.getUTCFullYear(),
+      fechaReferencia.getUTCMonth(),
+      fechaReferencia.getUTCDate(),
+    ),
+  );
+
+  const normalizados: ContratoNormalizado[] = contratos
+    .filter((c) => !!c.fecha_inicio)
+    .map((c) => {
+      const inicio = aUTC(c.fecha_inicio);
+      // Un contrato sin término (indefinido o en curso) se computa hasta hoy.
+      const vigente = !c.fecha_termino || aUTC(c.fecha_termino) >= hoy;
+      const termino = c.fecha_termino ? aUTC(c.fecha_termino) : hoy;
+      return { inicio, termino, vigente };
+    })
+    .sort((a, b) => a.inicio.getTime() - b.inicio.getTime());
+
+  if (normalizados.length === 0) return SIN_ALERTA;
+
+  // Solo se alerta sobre personal con relación laboral vigente: la norma
+  // importa para decidir si se puede o no terminar por vencimiento del plazo.
+  const tieneVigente = normalizados.some((c) => c.vigente);
+  if (!tieneVigente) return SIN_ALERTA;
+
+  let mejor: ResultadoAlerta | null = null;
+
+  for (let ancla = 0; ancla < normalizados.length; ancla++) {
+    const inicioVentana = normalizados[ancla].inicio;
+    const finVentana = sumarMeses(inicioVentana, cfg.ventana_meses);
+
+    // Contratos que caben completos dentro de la ventana de 15 meses.
+    const grupo = normalizados.filter(
+      (c, i) => i >= ancla && c.inicio >= inicioVentana && c.termino <= finVentana,
+    );
+    if (grupo.length === 0) continue;
+
+    const { meses, lapso, discontinuo, requisitos } = evaluarGrupo(grupo, cfg);
+
+    const cumpleTodos =
+      requisitos.contratos && requisitos.discontinuo && requisitos.acumulado && requisitos.ventana;
+
+    // "Próxima": ya es discontinuo, cabe en la ventana y le falta poco —
+    // sea por meses acumulados o por un contrato.
+    const cercaPorMeses =
+      meses >= cfg.meses_acumulados - MARGEN_PREVENTIVO_MESES && meses < cfg.meses_acumulados;
+    const cercaPorContratos = grupo.length === cfg.minimo_contratos - 1;
+    const esProxima =
+      !cumpleTodos &&
+      requisitos.discontinuo &&
+      requisitos.ventana &&
+      (grupo.length >= cfg.minimo_contratos || cercaPorContratos) &&
+      (cercaPorMeses || (cercaPorContratos && meses >= cfg.meses_acumulados));
+
+    if (!cumpleTodos && !esProxima) continue;
+
+    const candidato: ResultadoAlerta = {
+      califica: true,
+      nivel: cumpleTodos ? 'critica' : 'proxima',
+      totalContratos: grupo.length,
+      mesesTrabajados: Math.round(meses * 100) / 100,
+      mesesVentana: Math.round(lapso * 100) / 100,
+      esDiscontinuo: discontinuo,
+      tieneVigente,
+      // Pasada la ventana del grupo, un contrato nuevo abre un cómputo nuevo.
+      fechaSugerida: formatearFecha(sumarMeses(inicioVentana, cfg.ventana_meses + 1)),
+      requisitos,
+    };
+
+    // Se prioriza la situación más grave; a igual nivel, la de más meses.
+    const mejorPuntaje = mejor ? (mejor.nivel === 'critica' ? 1000 : 0) + mejor.mesesTrabajados : -1;
+    const puntaje = (candidato.nivel === 'critica' ? 1000 : 0) + candidato.mesesTrabajados;
+    if (puntaje > mejorPuntaje) mejor = candidato;
+  }
+
+  return mejor ?? { ...SIN_ALERTA, tieneVigente };
 }

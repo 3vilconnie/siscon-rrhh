@@ -40,7 +40,6 @@ export interface Trabajador {
   num_contratos?: number;
 }
 
-
 export interface PlantillaContrato {
   id: string;
   nombre: string;
@@ -83,9 +82,49 @@ export interface Usuario {
   created_at: string;
 }
 
+export type TipoLote = 'contrato' | 'anexo' | 'finiquito' | 'horas_extra';
+
+/** Un lote generado (contratos, anexos o finiquitos masivos). */
+export interface Lote {
+  id: string;
+  tipo: TipoLote;
+  estado: 'generado' | 'anulado';
+  cantidad: number;
+  formato?: string | null;
+  /** Configuración con la que se generó; permite reproducir el lote. */
+  parametros: Record<string, unknown>;
+  generado_por?: string | null;
+  generado_en: string;
+  anulado_por?: string | null;
+  anulado_en?: string | null;
+  motivo?: string | null;
+  items?: LoteItem[];
+}
+
+/**
+ * Un trabajador dentro del lote. Guarda los valores CALCULADOS al momento
+ * de emitir, no referencias: si mañana cambia una fórmula, el lote sigue
+ * mostrando lo que efectivamente se pagó.
+ */
+export interface LoteItem {
+  id?: string;
+  lote_id?: string;
+  trabajador_rut: number;
+  nombre_completo: string;
+  fecha_inicio?: string | null;
+  fecha_termino?: string | null;
+  /** Sueldo base (contrato/anexo) o total a pagar (finiquito). */
+  monto?: number | null;
+  detalle?: Record<string, unknown>;
+}
+
+/** Parámetros del art. 159 N°4 inciso 5° (presunción de contrato indefinido). */
 export interface ParametrosSistema {
+  /** Marco temporal en meses (15 por ley). */
   ventana_meses: number;
-  enfriamiento_meses: number;
+  /** Meses de servicios acumulados que gatillan la presunción (12 por ley). */
+  meses_acumulados: number;
+  /** Contratos mínimos: «más de dos» ⇒ 3 por ley. */
   minimo_contratos: number;
 }
 

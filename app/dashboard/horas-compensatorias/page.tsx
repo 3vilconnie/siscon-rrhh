@@ -432,17 +432,27 @@ export default function HorasCompensatoriasPage() {
                 </Alert>
               )}
 
-              <div>
-                <Form.Label className="small fw-bold text-secondary">Fecha del Permiso</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={fechaInput}
-                  onChange={(e) => setFechaInput(e.target.value)}
-                  disabled={guardando || !trabajadorEncontrado}
-                  required
-                  tabIndex={2}
-                />
+              <div className="d-flex justify-content-between align-items-center mb-1">
+                <Form.Label className="small fw-bold text-secondary mb-0">
+                  Fecha del Permiso
+                </Form.Label>
+                {fechaInput && (
+                  <Badge bg="info" text="dark" className="text-capitalize">
+                    <i className="bi bi-calendar-event me-1"></i>
+                    {new Date(fechaInput + 'T00:00:00').toLocaleDateString('es-CL', {
+                      weekday: 'long',
+                    })}
+                  </Badge>
+                )}
               </div>
+              <Form.Control
+                type="date"
+                value={fechaInput}
+                onChange={(e) => setFechaInput(e.target.value)}
+                disabled={guardando || !trabajadorEncontrado}
+                required
+                tabIndex={2}
+              />
               <div>
                 <Form.Label className="small fw-bold text-secondary">Horas Solicitadas</Form.Label>
                 <InputGroup>

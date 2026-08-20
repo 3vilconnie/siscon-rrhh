@@ -10,6 +10,7 @@ import crypto from 'node:crypto';
 import PizZip from 'pizzip';
 import type { DatosFiniquito } from '@/lib/finiquito';
 import { mergeDocxBuffers } from '@/lib/mergeDocx';
+import { resolverRutaPlantilla } from '@/lib/plantillaArchivo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -59,13 +60,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Formato debe ser "pdf" o "docx".' }, { status: 400 });
   }
 
-  const rutaPlantilla = path.join(process.cwd(), 'plantillas', ARCHIVO_PLANTILLA);
-  if (!fs.existsSync(rutaPlantilla)) {
-    return NextResponse.json(
-      { error: `No se encontró la plantilla "${ARCHIVO_PLANTILLA}".` },
-      { status: 404 },
-    );
-  }
+  const { ruta: rutaPlantilla, limpiar } = await resolverRutaPlantilla(ARCHIVO_PLANTILLA);
 
   const opciones = { lang: 'es-cl', timezone: 'America/Santiago' };
   let tempPdfSrc: string | null = null;
@@ -115,15 +110,19 @@ export async function POST(request: Request) {
     const mensaje = error instanceof Error ? error.message : String(error);
     const faltaLibreOffice =
       formato === 'pdf' && /soffice|libreoffice|could not|ENOENT|convert/i.test(mensaje);
+    const faltaPlantilla = /ENOENT/.test(mensaje);
     return NextResponse.json(
       {
         error: faltaLibreOffice
           ? 'No se pudo convertir a PDF. Verifica que LibreOffice esté instalado en el servidor. El formato Word (.docx) no lo requiere.'
-          : `Error al generar los finiquitos: ${mensaje}`,
+          : faltaPlantilla
+            ? `No se encontró la plantilla "${ARCHIVO_PLANTILLA}".`
+            : `Error al generar los finiquitos: ${mensaje}`,
       },
-      { status: 500 },
+      { status: faltaPlantilla ? 404 : 500 },
     );
   } finally {
+    limpiar();
     if (tempPdfSrc && fs.existsSync(tempPdfSrc)) {
       try {
         fs.unlinkSync(tempPdfSrc);

@@ -20,6 +20,13 @@ import {
   type FirmanteFiniquito,
 } from '@/lib/finiquito';
 import { descargarExcelCalculo } from '@/lib/finiquitoCalculoXlsx';
+import {
+  construirSetFeriados,
+  REGIONES_FERIADO,
+  type FeriadoManual,
+  type RegionFeriado,
+} from '@/lib/feriados';
+import { cargarFeriadosManuales } from '@/lib/feriadosRepo';
 
 export default function ModuloFiniquito() {
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
@@ -47,6 +54,23 @@ export default function ModuloFiniquito() {
   const [firmante, setFirmante] = useState<FirmanteFiniquito>({ ...FIRMANTE_FINIQUITO_DEFAULT });
   const [ciudad, setCiudad] = useState('Arica');
   const [redactorIniciales, setRedactorIniciales] = useState('crh');
+
+  // Feriados legales: definen qué días del feriado proyectado son inhábiles.
+  // La región determina si se suman los feriados regionales (ver lib/feriados.ts).
+  const [region, setRegion] = useState<RegionFeriado>('arica');
+  const [feriadosManuales, setFeriadosManuales] = useState<FeriadoManual[]>([]);
+
+  useEffect(() => {
+    cargarFeriadosManuales().then(setFeriadosManuales);
+  }, []);
+
+  /** Set de feriados que abarca el año del término y el siguiente. */
+  const feriados = useMemo(() => {
+    const anio = fechaTermino
+      ? Number(fechaTermino.slice(0, 4))
+      : new Date().getUTCFullYear();
+    return construirSetFeriados([anio, anio + 1], region, feriadosManuales);
+  }, [fechaTermino, region, feriadosManuales]);
 
   const [generando, setGenerando] = useState<'pdf' | 'docx' | null>(null);
 
@@ -112,7 +136,7 @@ export default function ModuloFiniquito() {
         sueldoImponible: sueldo,
         diasInhabiles: 0,
       });
-      setDiasInhabiles(estimarDiasInhabiles(term, diasHabiles));
+      setDiasInhabiles(estimarDiasInhabiles(term, diasHabiles, feriados));
     } else {
       setDiasInhabiles(0);
     }
@@ -147,8 +171,8 @@ export default function ModuloFiniquito() {
       sueldoImponible,
       diasInhabiles: 0,
     });
-    return estimarDiasInhabiles(fechaTermino, diasHabiles);
-  }, [contratoSel, fechaTermino, sueldoImponible]);
+    return estimarDiasInhabiles(fechaTermino, diasHabiles, feriados);
+  }, [contratoSel, fechaTermino, sueldoImponible, feriados]);
 
   // Datos y resultado del cálculo (en vivo).
   const calculo = useMemo(() => {
@@ -167,6 +191,7 @@ export default function ModuloFiniquito() {
       programa,
       firmante,
       diasInhabiles,
+      feriados,
     });
   }, [
     trabajadorSel,
@@ -174,6 +199,7 @@ export default function ModuloFiniquito() {
     fechaTermino,
     sueldoImponible,
     diasInhabiles,
+    feriados,
     programaId,
     causalId,
     articulo,
@@ -461,6 +487,27 @@ export default function ModuloFiniquito() {
                     </tr>
                   </tbody>
                 </Table>
+
+                <Row className="g-3 align-items-end mb-3">
+                  <Col xs={12} md={6}>
+                    <Form.Label className="small fw-bold text-secondary">
+                      Región (feriados regionales)
+                    </Form.Label>
+                    <Form.Select
+                      value={region}
+                      onChange={(e) => setRegion(e.target.value as RegionFeriado)}
+                    >
+                      {REGIONES_FERIADO.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.etiqueta}
+                        </option>
+                      ))}
+                    </Form.Select>
+                    <Form.Text className="text-muted">
+                      Determina si se descuenta el feriado regional (7 de junio en Arica).
+                    </Form.Text>
+                  </Col>
+                </Row>
 
                 <Row className="g-3 align-items-end">
                   <Col xs={12} md={6}>

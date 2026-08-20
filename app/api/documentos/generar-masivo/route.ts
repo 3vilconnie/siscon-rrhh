@@ -9,6 +9,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { PLANTILLAS, type DatosDocumento } from '@/lib/plantillas';
 import { mergeDocxBuffers } from '@/lib/mergeDocx';
+import { resolverRutaPlantilla } from '@/lib/plantillaArchivo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -49,13 +50,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Plantilla desconocida: ${plantillaId}` }, { status: 404 });
   }
 
-  const rutaPlantilla = path.join(process.cwd(), 'plantillas', plantilla.archivo);
-  if (!fs.existsSync(rutaPlantilla)) {
-    return NextResponse.json(
-      { error: `No se encontró el archivo de plantilla "${plantilla.archivo}".` },
-      { status: 404 },
-    );
-  }
+  const { ruta: rutaPlantilla, limpiar } = await resolverRutaPlantilla(plantilla.archivo);
 
   const opciones = { lang: 'es-cl', timezone: 'America/Santiago' };
   let tempPdfSrc: string | null = null;
@@ -103,15 +98,19 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     const mensaje = error instanceof Error ? error.message : String(error);
     const faltaLibreOffice = formato === 'pdf' && /soffice|libreoffice|could not|ENOENT|convert/i.test(mensaje);
+    const faltaPlantilla = /ENOENT/.test(mensaje);
     return NextResponse.json(
       {
         error: faltaLibreOffice
           ? 'No se pudo convertir a PDF. Verifica que LibreOffice esté instalado en el servidor. El formato Word (.docx) no lo requiere.'
-          : `Error al generar los documentos: ${mensaje}`,
+          : faltaPlantilla
+            ? `No se encontró el archivo de plantilla "${plantilla.archivo}".`
+            : `Error al generar los documentos: ${mensaje}`,
       },
-      { status: 500 },
+      { status: faltaPlantilla ? 404 : 500 },
     );
   } finally {
+    limpiar();
     if (tempPdfSrc && fs.existsSync(tempPdfSrc)) {
       try {
         fs.unlinkSync(tempPdfSrc);

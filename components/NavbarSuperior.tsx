@@ -315,6 +315,7 @@ export default function NavbarSuperior({
   ];
   const enlacesSecundarios = [
     { href: '/dashboard/horas-compensatorias', icon: 'bi-clock-history', label: 'Horas Comp.' },
+    { href: '/dashboard/horas-extra', icon: 'bi-clock-fill', label: 'Horas Extra' },
   ];
 
   // El enlace "activo" es el de href más específico (más largo) que hace match con la

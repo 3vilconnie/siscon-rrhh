@@ -32,7 +32,8 @@ export const PROGRAMAS_CONTRATO: ProgramaContrato[] = [
       "PROYECTO: 'CONVENIO DE TRANSFERENCIA Y COLABORACIÓN, ENTRE LA SECRETARÍA REGIONAL MINISTERIAL DE AGRICULTURA DEL PROGRAMA PLAN ZONAS REZAGADAS- FNDR DENOMINADO 'TRANSFERENCIA, CAPACITACIÓN Y GENERACIÓN DE EMPLEOS VERDES EN LA RESERVA BIOSFERA LAUCA' CODIGO BIP 40045543-0 Y LA CORPORACIÓN NACIONAL FORESTAL DE LA REGIÓN DE ARICA Y PARINACOTA'",
     subtitulo:
       "(FONDO DE TERCERO CONVENIO DE TRANSFERENCIA PROGRAMA PLAN ZONAS REZAGADAS-FNDR DENOMINADO 'TRANSFERENCIA, CAPACITACIÓN Y GENERACIÓN DE EMPLEOS VERDES EN LA RESERVA BIOSFERA LAUCA')",
-    nombre: 'Transferencia, capacitación y generación de empleos verdes en la Reserva Biosfera Lauca',
+    nombre:
+      'Transferencia, capacitación y generación de empleos verdes en la Reserva Biosfera Lauca',
   },
   {
     id: 'PZD1',
@@ -113,6 +114,8 @@ export interface EntradaContrato {
   // Sobrescribe fechas/sueldo del contrato de la BD si hace falta
   inicioContrato: string; // ISO
   terminoContrato: string; // ISO
+  /** Solo para Anexo de Ampliación: inicio del contrato original que se amplía. */
+  inicioContratoOriginal?: string; // ISO
   sueldo: number;
 }
 
@@ -147,6 +150,12 @@ export interface DatosContrato {
     El_trabajador: string; // "El trabajador" / "La trabajadora"
     del_trabajador: string; // "del trabajador" / "de la trabajadora"
     al_trabajador: string; // "al trabajador" / "a la trabajadora"
+    /** Sufijo "a" en femenino, "" en otro caso: permite escribir "trabajador{a}"
+     *  cuando la plantilla parte la palabra en dos (así viene el anexo). */
+    genero_a: string;
+    /** Sufijo "a" en femenino, "o" en otro caso: para "domiciliad{o/a}" y
+     *  "nacid{o/a}", que en masculino sí llevan vocal (anexo de horas extra). */
+    genero_o_a: string;
   };
   contrato: {
     inicio: string; // ISO
@@ -161,6 +170,17 @@ export interface DatosContrato {
     prevision: string;
     salud: string;
   };
+  /**
+   * Datos propios del Anexo de Ampliación (plantillas/anexo-ampliacion.docx).
+   * Solo se usan al generar anexos; en un contrato nuevo van vacíos.
+   */
+  anexo: {
+    /** Inicio del contrato ORIGINAL que se está ampliando (cláusula PRIMERO). */
+    inicio_original: string; // ISO
+    /** Período nuevo que se acuerda (cláusula SEGUNDO). */
+    nuevo_inicio: string; // ISO
+    nuevo_termino: string; // ISO
+  };
   bonos: {
     mostrar: boolean;
     numeral_ejemplares: string; // "DÉCIMO" / "NOVENO"
@@ -171,14 +191,14 @@ export interface DatosContrato {
   };
 }
 
-function trato(genero?: string): string {
+export function trato(genero?: string): string {
   if (genero === 'F') return 'Doña';
   if (genero === 'M') return 'Don';
   return 'Don(ña)';
 }
 
 /** Construye los textos que dependen del género (F = femenino). */
-function textosGenero(genero?: string): DatosContrato['g'] {
+export function textosGenero(genero?: string): DatosContrato['g'] {
   const f = genero === 'F';
   return {
     el_la: f ? 'la' : 'el',
@@ -187,6 +207,8 @@ function textosGenero(genero?: string): DatosContrato['g'] {
     El_trabajador: f ? 'La trabajadora' : 'El trabajador',
     del_trabajador: f ? 'de la trabajadora' : 'del trabajador',
     al_trabajador: f ? 'a la trabajadora' : 'al trabajador',
+    genero_a: f ? 'a' : '',
+    genero_o_a: f ? 'a' : 'o',
   };
 }
 
@@ -330,6 +352,13 @@ export function construirDatosContrato(
       prevision: entrada.prevision,
       salud: entrada.salud,
     },
+    anexo: {
+      // Si no se indica el contrato original, se cae al inicio del período
+      // nuevo para no dejar la cláusula PRIMERO en blanco.
+      inicio_original: entrada.inicioContratoOriginal || entrada.inicioContrato,
+      nuevo_inicio: entrada.inicioContrato,
+      nuevo_termino: entrada.terminoContrato,
+    },
     bonos: {
       mostrar: mostrarBonos,
       numeral_ejemplares: mostrarBonos ? 'DÉCIMO' : 'NOVENO',
@@ -345,9 +374,13 @@ export function construirDatosContrato(
 export function contratoSugerido(t: Trabajador): Contrato | null {
   const contratos = t.contratos ?? [];
   if (contratos.length === 0) return null;
-  const vigente = contratos.find((c) => !c.fecha_termino || new Date(c.fecha_termino) >= new Date());
+  const vigente = contratos.find(
+    (c) => !c.fecha_termino || new Date(c.fecha_termino) >= new Date(),
+  );
   return (
-    vigente ?? [...contratos].sort((a, b) => b.fecha_inicio.localeCompare(a.fecha_inicio))[0] ?? null
+    vigente ??
+    [...contratos].sort((a, b) => b.fecha_inicio.localeCompare(a.fecha_inicio))[0] ??
+    null
   );
 }
 
@@ -365,10 +398,31 @@ export interface CampoContrato {
 // ---------------------------------------------------------------------------
 
 const MESES_MAP: Record<string, number> = {
-  enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
-  julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
-  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
-  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+  enero: 1,
+  febrero: 2,
+  marzo: 3,
+  abril: 4,
+  mayo: 5,
+  junio: 6,
+  julio: 7,
+  agosto: 8,
+  septiembre: 9,
+  setiembre: 9,
+  octubre: 10,
+  noviembre: 11,
+  diciembre: 12,
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12,
 };
 
 /** Convierte una fecha en texto ("1 de April de 2026", "01-04-2026"…) o serial de Excel a ISO. */
@@ -415,12 +469,7 @@ export function parseNumeroCL(valor: unknown): number {
 
 /** Normaliza una clave de columna del Excel (mayúsculas, sin espacios ni acentos). */
 function normalizarClave(k: string): string {
-  return k
-    .trim()
-    .toUpperCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/\s+/g, '_');
+  return k.trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '_');
 }
 
 export interface FiltroFilaContrato {
@@ -493,13 +542,19 @@ export function datosContratoDesdeFilaExcel(
 
 export const CAMPOS_CONTRATO: CampoContrato[] = [
   { marcador: '{d.programa.proyecto}', descripcion: 'Proyecto/convenio (cabecera)' },
-  { marcador: '{d.programa.subtitulo}', descripcion: 'Subtítulo bajo el título (Fondo de tercero…)' },
+  {
+    marcador: '{d.programa.subtitulo}',
+    descripcion: 'Subtítulo bajo el título (Fondo de tercero…)',
+  },
   { marcador: '{d.programa.nombre}', descripcion: 'Nombre del programa (cláusula PRIMERO)' },
   { marcador: '{d.trabajador.trato}', descripcion: 'Don / Doña' },
   { marcador: '{d.trabajador.nombre_upper}', descripcion: 'Nombres en mayúsculas' },
   { marcador: '{d.trabajador.apellido_p_upper}', descripcion: 'Apellido paterno' },
   { marcador: '{d.trabajador.apellido_m_upper}', descripcion: 'Apellido materno' },
-  { marcador: '{d.trabajador.rut_miles} - {d.trabajador.dv}', descripcion: 'RUT y dígito verificador' },
+  {
+    marcador: '{d.trabajador.rut_miles} - {d.trabajador.dv}',
+    descripcion: 'RUT y dígito verificador',
+  },
   { marcador: '{d.trabajador.nacionalidad}', descripcion: 'Nacionalidad' },
   { marcador: '{d.trabajador.estado_civil}', descripcion: 'Estado civil' },
   { marcador: '{d.trabajador.lugar_nac}', descripcion: 'Lugar de nacimiento' },
@@ -515,11 +570,35 @@ export const CAMPOS_CONTRATO: CampoContrato[] = [
     marcador: '{d.contrato.control_asistencia}',
     descripcion: 'Control de asistencia (reloj biométrico / libro)',
   },
+  // Solo se usan en la plantilla del Anexo de Ampliación:
+  {
+    marcador: '{d.anexo.inicio_original:formatD(LL)}',
+    descripcion: 'Anexo: fecha del contrato original que se amplía',
+  },
+  {
+    marcador: '{d.anexo.nuevo_inicio:formatD(LL)}',
+    descripcion: 'Anexo: inicio del período nuevo',
+  },
+  {
+    marcador: '{d.anexo.nuevo_termino:formatD(LL)}',
+    descripcion: 'Anexo: término del período nuevo',
+  },
+  { marcador: '{d.g.el_la}', descripcion: 'el / la según género' },
+  { marcador: '{d.g.genero_a}', descripcion: 'Sufijo «a» en femenino (trabajador__)' },
+  { marcador: '{d.documento.ciudad}', descripcion: 'Ciudad de emisión' },
+  { marcador: '{d.documento.fecha_emision:formatD(LL)}', descripcion: 'Fecha de emisión' },
+  {
+    marcador: '{d.documento.redactor_iniciales}',
+    descripcion: 'Iniciales de quien redacta',
+  },
   { marcador: '{d.contrato.sueldo_texto}', descripcion: 'Sueldo (número con miles)' },
   { marcador: '{d.contrato.sueldo_palabras}', descripcion: 'Sueldo en palabras' },
   { marcador: '{d.contrato.prevision}', descripcion: 'Régimen previsional (AFP)' },
   { marcador: '{d.contrato.salud}', descripcion: 'Sistema de salud' },
-  { marcador: '{d.bonos.mov_texto} / {d.bonos.col_texto}', descripcion: 'Bonos movilización / colación' },
+  {
+    marcador: '{d.bonos.mov_texto} / {d.bonos.col_texto}',
+    descripcion: 'Bonos movilización / colación',
+  },
   { marcador: '{d.director.nombre}', descripcion: 'Nombre del director (firmante)' },
 ];
 

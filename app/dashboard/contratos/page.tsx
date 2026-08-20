@@ -26,13 +26,18 @@ import {
   AFP_OPCIONES,
   SALUD_OPCIONES,
   CONTROL_ASISTENCIA,
+  SIGPER_PROGRAMAS,
+  SIGPER_TIPO_TRABAJADOR,
+  unidadLaboralSigperDesdeLugar,
   fraseControlAsistencia,
   estadoCivilLabel,
   estadoCivilIdDesdeLabel,
   construirDatosContrato,
   contratoSugerido,
   type DirectorContrato,
+  type SigperTipoTrabajador,
 } from '@/lib/contrato';
+import { descargarCargaSigper, descargarBonosSigper } from '@/lib/sigperXlsx';
 
 type Modo = 'existente' | 'nuevo';
 
@@ -80,6 +85,13 @@ export default function ModuloContratos() {
   const [incluirBonos, setIncluirBonos] = useState(false);
   const [bonoMov, setBonoMov] = useState<number>(0);
   const [bonoCol, setBonoCol] = useState<number>(0);
+
+  // --- Exportación a SIGPER (misma lógica que Contratos Masivos, ver lib/sigperXlsx.ts) ---
+  const [sigperProgramaId, setSigperProgramaId] = useState(SIGPER_PROGRAMAS[0].id);
+  const [sigperUnidadLaboral, setSigperUnidadLaboral] = useState<number | null>(null);
+  const [sigperTipo, setSigperTipo] = useState<SigperTipoTrabajador>('obrero');
+  const [generandoSigper, setGenerandoSigper] = useState(false);
+  const [generandoBonosSigper, setGenerandoBonosSigper] = useState(false);
 
   // Documento.
   const [programaId, setProgramaId] = useState(PROGRAMAS_CONTRATO[0].id);
@@ -130,6 +142,48 @@ export default function ModuloContratos() {
       setLoading(false);
     })();
   }, []);
+
+  /** Sugiere la unidad laboral SIGPER desde el lugar de trabajo, sin pisar un valor ya escrito. */
+  const cambiarLugarTrabajo = (valor: string) => {
+    setLugarTrabajo(valor);
+    const sugerida = unidadLaboralSigperDesdeLugar(valor);
+    if (sugerida) setSigperUnidadLaboral(sugerida);
+  };
+
+  const exportarSigper = () => {
+    setGenerandoSigper(true);
+    try {
+      descargarCargaSigper([{ rut: rutNumero, tipo: sigperTipo, sueldo }], {
+        programaId: sigperProgramaId,
+        unidadLaboral: sigperUnidadLaboral ?? 0,
+        jornada,
+        fechaInicio: inicio,
+        fechaTermino: termino,
+      });
+      toast.success('Planilla SIGPER generada.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo generar la planilla SIGPER.');
+    } finally {
+      setGenerandoSigper(false);
+    }
+  };
+
+  const exportarBonosSigper = () => {
+    setGenerandoBonosSigper(true);
+    try {
+      const n = descargarBonosSigper([rutNumero], {
+        fechaInicio: inicio,
+        fechaTermino: termino,
+        bonoColacion: incluirBonos ? bonoCol : 0,
+        bonoMovilizacion: incluirBonos ? bonoMov : 0,
+      });
+      toast.success(`Voucher de bonos SIGPER generado (${n} filas).`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo generar el voucher de bonos.');
+    } finally {
+      setGenerandoBonosSigper(false);
+    }
+  };
 
   const aplicarPlantilla = (id: string) => {
     setPlantillaSeleccionadaId(id);
@@ -791,7 +845,7 @@ export default function ModuloContratos() {
                       {label('Lugar de trabajo (comuna)')}
                       <Form.Control
                         value={lugarTrabajo}
-                        onChange={(e) => setLugarTrabajo(e.target.value)}
+                        onChange={(e) => cambiarLugarTrabajo(e.target.value)}
                       />
                     </Col>
                     <Col xs={12}>
@@ -986,6 +1040,86 @@ export default function ModuloContratos() {
                     >
                       <i className="bi bi-file-earmark-pdf me-1"></i>
                       {generando === 'pdf' ? 'Generando...' : 'Generar PDF'}
+                    </Button>
+                  </div>
+                </Card.Body>
+              </Card>
+
+              {/* Exportación a SIGPER */}
+              <Card className="shadow-sm border-0">
+                <Card.Body className="p-4">
+                  <h6 className="fw-bold text-uppercase text-secondary small mb-3">
+                    <i className="bi bi-cloud-arrow-up me-2"></i>
+                    Planillas para SIGPER
+                  </h6>
+
+                  <Row className="g-3 mb-3">
+                    <Col xs={12} md={4}>
+                      {label('Programa SIGPER')}
+                      <Form.Select
+                        value={sigperProgramaId}
+                        onChange={(e) => setSigperProgramaId(e.target.value)}
+                      >
+                        {SIGPER_PROGRAMAS.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.etiqueta}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Col>
+                    <Col xs={6} md={4}>
+                      {label('Unidad laboral')}
+                      <Form.Control
+                        type="number"
+                        placeholder="Ej: 11504"
+                        value={sigperUnidadLaboral ?? ''}
+                        onChange={(e) =>
+                          setSigperUnidadLaboral(e.target.value ? Number(e.target.value) : null)
+                        }
+                      />
+                      <Form.Text className="text-muted" style={{ fontSize: '0.72rem' }}>
+                        Se sugiere desde el lugar de trabajo.
+                      </Form.Text>
+                    </Col>
+                    <Col xs={6} md={4}>
+                      {label('Tipo de trabajador')}
+                      <Form.Select
+                        value={sigperTipo}
+                        onChange={(e) => setSigperTipo(e.target.value as SigperTipoTrabajador)}
+                      >
+                        {Object.entries(SIGPER_TIPO_TRABAJADOR).map(([id, v]) => (
+                          <option key={id} value={id}>
+                            {v.etiqueta}
+                          </option>
+                        ))}
+                      </Form.Select>
+                      <Form.Text className="text-muted" style={{ fontSize: '0.72rem' }}>
+                        Define cargo legal y escalafón.
+                      </Form.Text>
+                    </Col>
+                  </Row>
+
+                  <div className="d-flex gap-2 justify-content-end flex-wrap">
+                    <Button
+                      variant="outline-secondary"
+                      disabled={!identidadValida || generandoSigper}
+                      onClick={exportarSigper}
+                    >
+                      <i className="bi bi-cloud-arrow-up me-1"></i>
+                      {generandoSigper ? 'Generando...' : 'Carga de personal'}
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      disabled={!identidadValida || !incluirBonos || generandoBonosSigper}
+                      onClick={exportarBonosSigper}
+                      title={
+                        incluirBonos
+                          ? 'Genera el Reconocimiento de Haberes'
+                          : 'Activa los bonos para habilitarlo'
+                      }
+                    >
+                      <i className="bi bi-cash-coin me-1"></i>
+                      {generandoBonosSigper ? 'Generando...' : 'Voucher de bonos'}
                     </Button>
                   </div>
                 </Card.Body>

@@ -13,8 +13,15 @@
 //   días_inhábiles = sábados/domingos/festivos del período proyectado (ajustable a mano)
 //   FP             = ROUND(días_hábiles + días_inhábiles, 2)
 //   TOTAL          = valor_día * FP
-// Validado contra la hoja: sueldo 600.000, 02-03-2026 → 30-04-2026, inhábiles 3
-//   ⇒ FP 5,42 y TOTAL 108.400.
+//
+// Validado contra la planilla con el caso 15-09-2025 → 30-05-2026, sueldo
+// 1.950.000: hábiles 10,625 → se proyectan 10 días (1-5 y 8-12 de junio),
+// inhábiles 3 (31-may, 6-jun, 7-jun) ⇒ FP 13,63 y TOTAL 885.950.
+//
+// Otro caso de referencia: 02-03-2026 → 30-04-2026 con sueldo 600.000 da
+// hábiles 2,42 e inhábiles estimados 2 (2 y 3 de mayo) ⇒ FP 4,42. En la hoja
+// original ese finiquito quedó con 3 inhábiles porque el 1 de mayo es feriado:
+// la estimación NO considera festivos, por eso el valor se puede ajustar a mano.
 
 import { Trabajador, Contrato } from '@/types';
 
@@ -57,33 +64,60 @@ export function datedifDias(iso1: string, iso2: string): number {
 }
 
 /**
- * Estima los días inhábiles (sábados y domingos) del feriado proyectado.
- * Proyecta los días hábiles del feriado en el calendario a partir del día
- * siguiente al término del contrato y cuenta los fines de semana intercalados.
- * Es solo una SUGERENCIA: no incluye festivos, por lo que se puede ajustar a mano.
+ * Proyecta el feriado en el calendario a partir del día siguiente al término
+ * del contrato y devuelve qué fechas quedan marcadas como hábiles (las que
+ * consumen el feriado) y cuáles como inhábiles (fines de semana intercalados).
+ *
+ * Replica la planilla original en dos puntos que son fáciles de errar:
+ *
+ *  1. Solo se proyectan los días hábiles ENTEROS (`Math.floor`). La fracción
+ *     (p.ej. el 0,625 de 10,625) se suma aritméticamente al final, pero NO
+ *     consume un día más del calendario. Redondear hacia arriba haría avanzar
+ *     el cursor un día extra y, si ese día cae después de un fin de semana,
+ *     arrastraría 2 días inhábiles que no corresponden.
+ *
+ *  2. El período arranca el día siguiente al término, aunque sea sábado o
+ *     domingo: esos días también cuentan como inhábiles. Si el contrato
+ *     termina un sábado, el domingo siguiente ya es parte del feriado.
+ *
+ * Los feriados legales se reciben en `feriados` (set de fechas ISO): un feriado
+ * en medio del período NO consume día hábil y se cuenta como inhábil. Ver
+ * lib/feriados.ts. Si no se entrega el set, solo se consideran fines de semana.
  */
-export function estimarDiasInhabiles(fechaTerminoISO: string, diasHabiles: number): number {
-  const n = Math.round(diasHabiles);
-  if (n <= 0) return 0;
+export function proyectarFeriado(
+  fechaTerminoISO: string,
+  diasHabiles: number,
+  feriados: Set<string> = new Set(),
+): { habiles: string[]; inhabiles: string[] } {
+  const habiles: string[] = [];
+  const inhabiles: string[] = [];
+
+  const objetivo = Math.floor(diasHabiles);
+  if (objetivo <= 0) return { habiles, inhabiles };
 
   const cursor = fechaISOaUTC(fechaTerminoISO);
   cursor.setUTCDate(cursor.getUTCDate() + 1); // día siguiente al término
 
-  let habilesContados = 0;
-  let inhabiles = 0;
   // Cota de seguridad para evitar bucles infinitos.
-  for (let guardia = 0; guardia < 400 && habilesContados < n; guardia++) {
+  for (let guardia = 0; guardia < 400 && habiles.length < objetivo; guardia++) {
     const dow = cursor.getUTCDay(); // 0 = domingo, 6 = sábado
-    if (dow === 0 || dow === 6) {
-      // Solo cuenta el fin de semana si ya empezó el feriado (evita fines de
-      // semana previos al primer día hábil).
-      if (habilesContados > 0) inhabiles++;
-    } else {
-      habilesContados++;
-    }
+    const iso = cursor.toISOString().slice(0, 10);
+    const esFinDeSemana = dow === 0 || dow === 6;
+    if (esFinDeSemana || feriados.has(iso)) inhabiles.push(iso);
+    else habiles.push(iso);
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
-  return inhabiles;
+
+  return { habiles, inhabiles };
+}
+
+/** Estima los días inhábiles (fines de semana y feriados) del feriado proyectado. */
+export function estimarDiasInhabiles(
+  fechaTerminoISO: string,
+  diasHabiles: number,
+  feriados: Set<string> = new Set(),
+): number {
+  return proyectarFeriado(fechaTerminoISO, diasHabiles, feriados).inhabiles.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +130,8 @@ export interface FiniquitoInput {
   sueldoImponible: number;
   /** Días inhábiles del feriado (por defecto se estiman y luego se pueden ajustar). */
   diasInhabiles?: number;
+  /** Feriados legales (fechas ISO) que caen dentro del feriado proyectado. */
+  feriados?: Set<string>;
 }
 
 export interface ResultadoFiniquito {
@@ -123,7 +159,8 @@ export function calcularFiniquito(input: FiniquitoInput): ResultadoFiniquito {
 
   const diasHabiles = FACTOR_FERIADO * meses + (FACTOR_FERIADO / DIAS_MES) * dias;
   const diasInhabiles =
-    input.diasInhabiles ?? estimarDiasInhabiles(input.fechaTermino, diasHabiles);
+    input.diasInhabiles ??
+    estimarDiasInhabiles(input.fechaTermino, diasHabiles, input.feriados ?? new Set());
 
   const fp = redondear(diasHabiles + diasInhabiles, 2);
   const total = Math.round(valorDia * fp);
@@ -391,6 +428,9 @@ export interface DatosFiniquito {
     dias_habiles: number; // sin redondear (2.4167)
     dias_habiles_texto: string; // ej. "2,42"
     dias_inhabiles: number;
+    /** Feriados legales (ISO) considerados al proyectar; viajan con los datos
+     *  para que el Excel de cálculo pinte los mismos días que el documento. */
+    feriados: string[];
     fp: number; // 5.42
     fp_texto: string; // "5,42"
     total: number; // 108400
@@ -407,6 +447,8 @@ export interface OpcionesFiniquito {
   firmante?: FirmanteFiniquito;
   /** Días inhábiles ajustados a mano; si se omite, se estiman. */
   diasInhabiles?: number;
+  /** Feriados legales (ISO). Ver lib/feriados.ts. */
+  feriados?: Set<string>;
 }
 
 /** Formatea un número con coma decimal chilena y n decimales (2,42). */
@@ -439,6 +481,7 @@ export function construirDatosFiniquito(
     fechaTermino,
     sueldoImponible: contrato.sueldo_base ?? 0,
     diasInhabiles: opciones.diasInhabiles,
+    feriados: opciones.feriados,
   });
 
   const segundo = trabajador.segundo_apellido ?? '';
@@ -479,6 +522,7 @@ export function construirDatosFiniquito(
       dias_habiles: resultado.diasHabiles,
       dias_habiles_texto: formatearDecimal(resultado.diasHabiles, 2),
       dias_inhabiles: resultado.diasInhabiles,
+      feriados: [...(opciones.feriados ?? [])],
       fp: resultado.fp,
       fp_texto: formatearDecimal(resultado.fp, 2),
       total: resultado.total,

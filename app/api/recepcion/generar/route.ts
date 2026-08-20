@@ -4,8 +4,7 @@
 // Requiere runtime Node y, solo para PDF, LibreOffice instalado en el servidor.
 
 import { NextResponse } from 'next/server';
-import path from 'node:path';
-import fs from 'node:fs';
+import { resolverRutaPlantilla } from '@/lib/plantillaArchivo';
 import type { DatosRecepcion } from '@/lib/recepcion';
 
 export const runtime = 'nodejs';
@@ -40,13 +39,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Formato debe ser "pdf" o "docx".' }, { status: 400 });
   }
 
-  const rutaPlantilla = path.join(process.cwd(), 'plantillas', ARCHIVO_PLANTILLA);
-  if (!fs.existsSync(rutaPlantilla)) {
-    return NextResponse.json(
-      { error: `No se encontró la plantilla "${ARCHIVO_PLANTILLA}" en la carpeta /plantillas.` },
-      { status: 404 },
-    );
-  }
+  const { ruta: rutaPlantilla, limpiar } = await resolverRutaPlantilla(ARCHIVO_PLANTILLA);
 
   try {
     const carbone = (await import('carbone')).default;
@@ -75,14 +68,19 @@ export async function POST(request: Request) {
     const mensaje = error instanceof Error ? error.message : String(error);
     const faltaLibreOffice =
       formato === 'pdf' && /soffice|libreoffice|could not|ENOENT|convert/i.test(mensaje);
+    const faltaPlantilla = /ENOENT/.test(mensaje);
 
     return NextResponse.json(
       {
         error: faltaLibreOffice
           ? 'No se pudo convertir a PDF. Verifica que LibreOffice esté instalado en el servidor. El formato Word (.docx) no requiere LibreOffice.'
-          : `Error al generar el documento: ${mensaje}`,
+          : faltaPlantilla
+            ? `No se encontró la plantilla "${ARCHIVO_PLANTILLA}".`
+            : `Error al generar el documento: ${mensaje}`,
       },
-      { status: 500 },
+      { status: faltaPlantilla ? 404 : 500 },
     );
+  } finally {
+    limpiar();
   }
 }

@@ -23,6 +23,8 @@ import { supabase } from '@/lib/supabase';
 import Pagination from '@/components/Pagination';
 import { registrarAuditoria, ACCIONES } from '@/lib/auditoria';
 import { calcularDV } from '@/lib/rut';
+import { descargarCargaSigper, descargarBonosSigper } from '@/lib/sigperXlsx';
+import { registrarLote } from '@/lib/lotesRepo';
 import { formatearRutFiniquito } from '@/lib/finiquito';
 import { Trabajador, PlantillaContrato } from '@/types';
 import {
@@ -32,14 +34,8 @@ import {
   SALUD_OPCIONES,
   CONTROL_ASISTENCIA,
   fraseControlAsistencia,
-  SIGPER_CONSTANTES,
   SIGPER_PROGRAMAS,
   SIGPER_TIPO_TRABAJADOR,
-  SIGPER_ENCABEZADOS_DATOS_CARGA,
-  SIGPER_ESTRUCTURA_CARGA,
-  SIGPER_CODIGO_AGRUPACION,
-  SIGPER_ENCABEZADOS_BONOS,
-  SIGPER_ESTRUCTURA_BONOS,
   unidadLaboralSigperDesdeLugar,
   estadoCivilLabel,
   estadoCivilIdDesdeLabel,
@@ -475,6 +471,11 @@ export default function ContratosMasivosPage() {
         incluirBonos: config.incluirBonos,
         inicioContrato: config.fechaInicio,
         terminoContrato: config.fechaTermino,
+        // En un anexo, la cláusula PRIMERO cita la fecha del contrato ORIGINAL
+        // que se está ampliando, no la del período nuevo.
+        inicioContratoOriginal: config.esAnexo
+          ? (t.contratos?.find((c) => c.id === contratoOrigenDe(t))?.fecha_inicio ?? undefined)
+          : undefined,
         sueldo: sueldoDe(t),
       },
     );
@@ -573,7 +574,9 @@ export default function ContratosMasivosPage() {
 
     setIsSubmitting(true);
     setGenerando(formato);
-    const toastId = toast.loading(`Generando ${seleccionadosData.length} contratos...`);
+    const toastId = toast.loading(
+      `Generando ${seleccionadosData.length} ${config.esAnexo ? 'anexos de ampliación' : 'contratos'}...`,
+    );
     try {
       if (guardarEnBase) {
         const ok = await guardarSeleccionEnBase();
@@ -588,18 +591,67 @@ export default function ContratosMasivosPage() {
       const res = await fetch('/api/contratos/generar-masivo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formato, documentos }),
+        // El tipo define qué plantilla usa el servidor: contrato-trabajo.docx
+        // o anexo-ampliacion.docx.
+        body: JSON.stringify({
+          formato,
+          documentos,
+          tipo: config.esAnexo ? 'anexo' : 'contrato',
+        }),
       });
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'Error desconocido.' }));
         throw new Error(error);
       }
       const blob = await res.blob();
-      descargarBlob(blob, `contratos_masivo_${documentos.length}.${formato}`);
+      const etiqueta = config.esAnexo ? 'anexos de ampliación' : 'contratos';
+      descargarBlob(
+        blob,
+        config.esAnexo
+          ? `anexos_ampliacion_${documentos.length}.${formato}`
+          : `contratos_masivo_${documentos.length}.${formato}`,
+      );
+      // Registro del lote: automático y best-effort (si falla, no se
+      // interrumpe nada, los documentos ya se descargaron).
+      await registrarLote({
+        tipo: config.esAnexo ? 'anexo' : 'contrato',
+        formato,
+        parametros: {
+          programaId: config.programaId,
+          fechaInicio: config.fechaInicio,
+          fechaTermino: config.fechaTermino,
+          labores: config.labores,
+          lugarTrabajo: config.lugarTrabajo,
+          dependenciaDirecta: config.dependenciaDirecta,
+          jornada: config.jornada,
+          controlAsistencia: config.controlAsistencia,
+          incluirBonos: config.incluirBonos,
+          bonoMovilizacion: config.incluirBonos ? config.bonoMovilizacion : 0,
+          bonoColacion: config.incluirBonos ? config.bonoColacion : 0,
+          ciudad: config.ciudad,
+          fechaEmision: config.fechaEmision,
+          guardadoEnBase: guardarEnBase,
+        },
+        items: seleccionadosData.map((t) => ({
+          trabajador_rut: t.rut,
+          nombre_completo: `${t.nombres} ${t.primer_apellido} ${t.segundo_apellido ?? ''}`
+            .trim()
+            .toUpperCase(),
+          fecha_inicio: config.fechaInicio || null,
+          fecha_termino: config.fechaTermino || null,
+          monto: sueldoDe(t),
+          detalle: {
+            prevision: previsionDe(t),
+            salud: saludDe(t),
+            ...(config.esAnexo ? { contratoOrigenId: contratoOrigenDe(t) } : {}),
+          },
+        })),
+      });
+
       toast.success(
         guardarEnBase
-          ? 'Contratos generados y guardados en la base.'
-          : `${documentos.length} contratos generados.`,
+          ? `${etiqueta.charAt(0).toUpperCase() + etiqueta.slice(1)} generados y guardados en la base.`
+          : `${documentos.length} ${etiqueta} generados.`,
         { id: toastId },
       );
     } catch (error) {
@@ -614,173 +666,46 @@ export default function ContratosMasivosPage() {
     }
   };
 
-  // SIGPER espera fechas reales de Excel (no texto): si se escriben como string
-  // "dd-mm-yyyy", Excel las deja como texto plano y ni Excel ni SIGPER las
-  // reconocen como fecha hasta que alguien las "toca" a mano. Por eso se
-  // calculan como serial de fecha de Excel (días desde 1899-12-30, igual que
-  // ya hace parseFechaTexto en lib/contrato.ts para leer) y luego se les
-  // aplica el formato de despliegue "dd-mm-yyyy" directamente sobre la celda.
-  const fechaExcelSerial = (iso: string) => {
-    const [y, m, d] = iso.split('-').map(Number);
-    return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000);
-  };
-
-  /** Primer día del mes de una fecha ISO — el "inicio de pago" del bono es siempre
-   *  el 1 del mes en que empieza el contrato, no la fecha exacta de contratación. */
-  const primerDiaDelMesSigper = (iso: string) => {
-    const [y, m] = iso.split('-');
-    return fechaExcelSerial(`${y}-${m}-01`);
-  };
-
-  /** Día siguiente a una fecha ISO — la "Fecha Inicio Prox. Pago" del bienio es
-   *  siempre el día después de que termina el contrato. */
-  const diaSiguienteSigper = (iso: string) => fechaExcelSerial(iso) + 1;
-
-  /** Marca como fecha (dd-mm-yyyy) las celdas de las columnas dadas, filas 2..N+1 (bajo el encabezado). */
-  const aplicarFormatoFechaSigper = (ws: XLSX.WorkSheet, columnas: string[], totalFilas: number) => {
-    for (const col of columnas) {
-      for (let fila = 2; fila <= totalFilas + 1; fila++) {
-        const celda = ws[`${col}${fila}`];
-        if (celda) celda.z = 'dd-mm-yyyy';
-      }
-    }
-  };
-
   const exportarSigper = () => {
-    if (!config.sigperProgramaId) {
-      toast.error('Selecciona el Programa SIGPER.');
-      return;
-    }
-    if (!config.sigperUnidadLaboral) {
-      toast.error('Indica la Unidad laboral SIGPER.');
-      return;
-    }
-    if (!config.fechaInicio || !config.fechaTermino) {
-      toast.error('Completa la fecha de inicio y término.');
-      return;
-    }
-    if (seleccionadosData.some((t) => sueldoDe(t) <= 0)) {
-      toast.error('Indica el sueldo de cada trabajador.');
-      return;
-    }
-
     setGenerandoSigper(true);
     try {
-      const proyecto = SIGPER_PROGRAMAS.find((p) => p.id === config.sigperProgramaId)!.proyecto;
-
-      const filas = seleccionadosData.map((t) => {
-        const tipo = SIGPER_TIPO_TRABAJADOR[sigperTipoDe(t)];
-        return [
-          t.rut,
-          tipo.escalafon,
-          SIGPER_CONSTANTES.escalafonDipres,
-          tipo.cargoLegal,
-          config.jornada,
-          config.sigperUnidadLaboral,
-          SIGPER_CONSTANTES.seccion,
-          proyecto,
-          SIGPER_CONSTANTES.fuenteFinanciamiento,
-          SIGPER_CONSTANTES.programaPresupuestario,
-          SIGPER_CONSTANTES.programa,
-          SIGPER_CONSTANTES.subPrograma,
-          SIGPER_CONSTANTES.tarea,
-          SIGPER_CONSTANTES.actividad,
-          fechaExcelSerial(config.fechaInicio),
-          fechaExcelSerial(config.fechaTermino),
-          sueldoDe(t),
-        ];
-      });
-
-      const wsDatos = XLSX.utils.aoa_to_sheet([SIGPER_ENCABEZADOS_DATOS_CARGA, ...filas]);
-      wsDatos['!cols'] = SIGPER_ENCABEZADOS_DATOS_CARGA.map(() => ({ wch: 16 }));
-      aplicarFormatoFechaSigper(wsDatos, ['O', 'P'], filas.length);
-      const wsEstructura = XLSX.utils.aoa_to_sheet(SIGPER_ESTRUCTURA_CARGA);
-      wsEstructura['!cols'] = [{ wch: 40 }, { wch: 14 }, { wch: 40 }];
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, wsDatos, 'Datos carga');
-      XLSX.utils.book_append_sheet(wb, wsEstructura, 'Estructura carga');
-      XLSX.writeFile(wb, `sigper_carga_${config.sigperProgramaId}_${filas.length}.xlsx`);
-
-      toast.success(`Archivo SIGPER generado (${filas.length} trabajadores).`);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'No se pudo generar el archivo SIGPER.',
+      const n = descargarCargaSigper(
+        seleccionadosData.map((t) => ({
+          rut: t.rut,
+          tipo: sigperTipoDe(t),
+          sueldo: sueldoDe(t),
+        })),
+        {
+          programaId: config.sigperProgramaId,
+          unidadLaboral: config.sigperUnidadLaboral ?? 0,
+          jornada: config.jornada,
+          fechaInicio: config.fechaInicio,
+          fechaTermino: config.fechaTermino,
+        },
       );
+      toast.success(`Archivo SIGPER generado (${n} trabajadores).`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo generar el archivo SIGPER.');
     } finally {
       setGenerandoSigper(false);
     }
   };
 
   const exportarBonosSigper = () => {
-    if (!config.incluirBonos || (config.bonoMovilizacion <= 0 && config.bonoColacion <= 0)) {
-      toast.error('No hay bonos configurados en el Paso 2.');
-      return;
-    }
-    if (!config.fechaInicio || !config.fechaTermino) {
-      toast.error('Completa la fecha de inicio y término.');
-      return;
-    }
-
     setGenerandoBonosSigper(true);
     try {
-      const inicio = primerDiaDelMesSigper(config.fechaInicio);
-      const termino = fechaExcelSerial(config.fechaTermino);
-      const proximoBienio = diaSiguienteSigper(config.fechaTermino);
-
-      const filas: (string | number)[][] = [];
-      for (const t of seleccionadosData) {
-        if (config.bonoColacion > 0) {
-          filas.push([
-            t.rut,
-            SIGPER_CODIGO_AGRUPACION.colacion,
-            '',
-            inicio,
-            termino,
-            config.bonoColacion,
-            '',
-            proximoBienio,
-            'N',
-            0,
-          ]);
-        }
-        if (config.bonoMovilizacion > 0) {
-          filas.push([
-            t.rut,
-            SIGPER_CODIGO_AGRUPACION.movilizacion,
-            '',
-            inicio,
-            termino,
-            config.bonoMovilizacion,
-            '',
-            proximoBienio,
-            'N',
-            0,
-          ]);
-        }
-      }
-
-      if (filas.length === 0) {
-        toast.error('No hay bonos configurados en el Paso 2.');
-        return;
-      }
-
-      const wsDatos = XLSX.utils.aoa_to_sheet([SIGPER_ENCABEZADOS_BONOS, ...filas]);
-      wsDatos['!cols'] = SIGPER_ENCABEZADOS_BONOS.map(() => ({ wch: 16 }));
-      aplicarFormatoFechaSigper(wsDatos, ['D', 'E', 'H'], filas.length);
-      const wsEstructura = XLSX.utils.aoa_to_sheet(SIGPER_ESTRUCTURA_BONOS);
-      wsEstructura['!cols'] = [{ wch: 30 }, { wch: 26 }, { wch: 40 }];
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, wsDatos, 'DATOS');
-      XLSX.utils.book_append_sheet(wb, wsEstructura, 'ESTRUCTURA');
-      XLSX.writeFile(wb, `sigper_bonos_${filas.length}.xls`, { bookType: 'biff8' });
-
-      toast.success(`Voucher de bonos SIGPER generado (${filas.length} filas).`);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'No se pudo generar el voucher de bonos.',
+      const n = descargarBonosSigper(
+        seleccionadosData.map((t) => t.rut),
+        {
+          fechaInicio: config.fechaInicio,
+          fechaTermino: config.fechaTermino,
+          bonoColacion: config.incluirBonos ? config.bonoColacion : 0,
+          bonoMovilizacion: config.incluirBonos ? config.bonoMovilizacion : 0,
+        },
       );
+      toast.success(`Voucher de bonos SIGPER generado (${n} filas).`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo generar el voucher de bonos.');
     } finally {
       setGenerandoBonosSigper(false);
     }

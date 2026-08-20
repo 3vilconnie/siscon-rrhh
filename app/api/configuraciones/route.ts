@@ -53,7 +53,7 @@ export async function GET() {
 // POST: Guardar modificaciones (Protegido para lógicas de administración)
 export async function POST(request: Request) {
   try {
-    const body = await request.json(); // Espera un objeto { ventana_meses, enfriamiento_meses, minimo_contratos }
+    const body = await request.json(); // Espera un objeto { ventana_meses, meses_acumulados, minimo_contratos }
 
     for (const [clave, valor] of Object.entries(body)) {
       const { error } = await supabaseAdmin.from('configuraciones').upsert({

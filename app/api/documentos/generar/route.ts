@@ -4,8 +4,7 @@
 // LibreOffice instalado en el servidor (Carbone lo invoca por debajo).
 
 import { NextResponse } from 'next/server';
-import path from 'node:path';
-import fs from 'node:fs';
+import { resolverRutaPlantilla } from '@/lib/plantillaArchivo';
 import { PLANTILLAS, type DatosDocumento } from '@/lib/plantillas';
 
 export const runtime = 'nodejs';
@@ -44,15 +43,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Plantilla desconocida: ${plantillaId}` }, { status: 404 });
   }
 
-  const rutaPlantilla = path.join(process.cwd(), 'plantillas', plantilla.archivo);
-  if (!fs.existsSync(rutaPlantilla)) {
-    return NextResponse.json(
-      {
-        error: `No se encontró el archivo de plantilla "${plantilla.archivo}". Debe existir en la carpeta /plantillas del proyecto.`,
-      },
-      { status: 404 },
-    );
-  }
+  const { ruta: rutaPlantilla, limpiar } = await resolverRutaPlantilla(plantilla.archivo);
 
   try {
     // Import dinámico para mantener Carbone fuera del bundle del cliente.
@@ -84,14 +75,19 @@ export async function POST(request: Request) {
     const faltaLibreOffice =
       formato === 'pdf' &&
       /soffice|libreoffice|could not|ENOENT|convert/i.test(mensaje);
+    const faltaPlantilla = /ENOENT/.test(mensaje);
 
     return NextResponse.json(
       {
         error: faltaLibreOffice
           ? 'No se pudo convertir a PDF. Verifica que LibreOffice esté instalado en el servidor. El formato Word (.docx) no requiere LibreOffice.'
-          : `Error al generar el documento: ${mensaje}`,
+          : faltaPlantilla
+            ? `No se encontró el archivo de plantilla "${plantilla.archivo}".`
+            : `Error al generar el documento: ${mensaje}`,
       },
-      { status: 500 },
+      { status: faltaPlantilla ? 404 : 500 },
     );
+  } finally {
+    limpiar();
   }
 }

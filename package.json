@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "validar:plantillas": "node scripts/validar-plantillas.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

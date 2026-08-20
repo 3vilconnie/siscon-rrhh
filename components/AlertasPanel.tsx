@@ -23,10 +23,11 @@ export default function AlertasPanel() {
 
   const detalleRef = useRef<HTMLDivElement>(null);
 
+  // Valores del art. 159 N°4 inciso 5°.
   const [parametros, setParametros] = useState({
     ventana_meses: 15,
-    enfriamiento_meses: 3,
-    minimo_contratos: 2,
+    meses_acumulados: 12,
+    minimo_contratos: 3,
   });
 
   useEffect(() => {
@@ -35,7 +36,13 @@ export default function AlertasPanel() {
         const resConfig = await fetch('/api/configuraciones');
         if (resConfig.ok) {
           const dataConfig = await resConfig.json();
-          if (dataConfig.ventana_meses) setParametros(dataConfig);
+          // Se fusiona con los valores por defecto: la tabla puede no tener
+          // todavía las claves nuevas (o conservar las del criterio anterior).
+          setParametros((prev) => ({
+            ventana_meses: Number(dataConfig.ventana_meses) || prev.ventana_meses,
+            meses_acumulados: Number(dataConfig.meses_acumulados) || prev.meses_acumulados,
+            minimo_contratos: Number(dataConfig.minimo_contratos) || prev.minimo_contratos,
+          }));
         }
 
         const { data: lista, error } = await supabase
@@ -78,9 +85,18 @@ export default function AlertasPanel() {
           totalContratos: analisis.totalContratos,
           tieneVigente: analisis.tieneVigente,
           fechaSugerida: analisis.fechaSugerida,
+          nivel: analisis.nivel,
+          mesesTrabajados: analisis.mesesTrabajados,
+          mesesVentana: analisis.mesesVentana,
           contratos: contratosOrdenados,
         });
       }
+    });
+
+    // Las críticas (presunción ya gatillada) primero.
+    listadoCalculado.sort((a, b) => {
+      if (a.nivel !== b.nivel) return a.nivel === 'critica' ? -1 : 1;
+      return b.mesesTrabajados - a.mesesTrabajados;
     });
 
     setAlertas(listadoCalculado);
@@ -165,16 +181,25 @@ export default function AlertasPanel() {
                         RUT: {a.rut}-{a.dv}
                       </span>
                     </div>
-                    <Badge bg="danger" className="p-2 small">
-                      {a.totalContratos} Contratos
+                    <Badge bg={a.nivel === 'critica' ? 'danger' : 'warning'} className="p-2 small">
+                      {a.totalContratos} Contratos · {a.mesesTrabajados} m
                     </Badge>
                   </div>
 
                   <div className="mt-2 d-flex flex-wrap gap-2 align-items-center justify-content-between">
                     <span className="text-muted small">
                       <i className="bi bi-calendar-range me-1"></i>
-                      Sugerencia Retorno:{' '}
-                      <strong className="text-dark">{a.fechaSugerida || 'Inmediato'}</strong>
+                      {a.nivel === 'critica' ? (
+                        <>
+                          <strong className="text-danger">Ya es indefinido por ley</strong> · nueva
+                          ventana desde {a.fechaSugerida}
+                        </>
+                      ) : (
+                        <>
+                          Por cumplir la regla · nueva ventana desde{' '}
+                          <strong className="text-dark">{a.fechaSugerida}</strong>
+                        </>
+                      )}
                     </span>
                     {/* span (no <button>) para no anidar botones dentro del
                         ListGroup.Item action, que ya se renderiza como <button> */}
@@ -206,14 +231,37 @@ export default function AlertasPanel() {
               <CloseButton onClick={() => setSeleccionado(null)} />
             </div>
 
-            <Alert variant="warning" className="border-0 p-3 small mb-4 shadow-sm">
+            <Alert
+              variant={seleccionado.nivel === 'critica' ? 'danger' : 'warning'}
+              className="border-0 p-3 small mb-4 shadow-sm"
+            >
               <div className="d-flex align-items-center mb-1">
-                <i className="bi bi-shield-exclamation text-warning fs-5 me-2"></i>
-                <strong className="text-dark">Sugerencia de Próxima Contratación:</strong>
+                <i className="bi bi-shield-exclamation fs-5 me-2"></i>
+                <strong className="text-dark">
+                  {seleccionado.nivel === 'critica'
+                    ? 'Art. 159 N°4: contrato indefinido de pleno derecho'
+                    : 'Art. 159 N°4: próximo a cumplirse'}
+                </strong>
               </div>
               <p className="m-0 text-dark-emphasis mb-2 small">
-                Para romper la continuidad legal, la siguiente firma de contrato no debería ser
-                antes del:
+                {seleccionado.nivel === 'critica' ? (
+                  <>
+                    Acumula <strong>{seleccionado.mesesTrabajados} meses</strong> de servicios
+                    discontinuos en <strong>{seleccionado.totalContratos} contratos</strong>, dentro
+                    de un lapso de <strong>{seleccionado.mesesVentana} meses</strong>. No procede
+                    terminar por vencimiento del plazo; la antigüedad se cuenta desde el primer
+                    contrato.
+                  </>
+                ) : (
+                  <>
+                    Acumula <strong>{seleccionado.mesesTrabajados} meses</strong> en{' '}
+                    <strong>{seleccionado.totalContratos} contratos</strong> discontinuos. Una
+                    renovación más podría gatillar la presunción.
+                  </>
+                )}
+              </p>
+              <p className="m-0 text-dark-emphasis mb-2 small">
+                Un contrato firmado desde esta fecha abre una ventana nueva de 15 meses:
               </p>
               <div className="p-2 bg-white rounded border text-center font-monospace fw-bold fs-6 text-danger">
                 {seleccionado.fechaSugerida || 'Revisar Historial'}
@@ -245,10 +293,10 @@ export default function AlertasPanel() {
                               transform: 'translateY(-50%)',
                             }}
                           ></div>
-                          <Badge
-                            bg={brecha.meses < parametros.enfriamiento_meses ? 'danger' : 'success'}
-                            className="text-white border small"
-                          >
+                          {/* Bajo el art. 159 N°4 cualquier brecha basta para que
+                              los servicios sean "discontinuos": es informativa,
+                              no un semáforo de bueno/malo. */}
+                          <Badge bg="secondary" className="text-white border small">
                             Brecha entre contratos: {brecha.meses} meses
                           </Badge>
                         </div>

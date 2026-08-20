@@ -260,7 +260,10 @@ export default function DetalleTrabajadorPage() {
 
             return (
               <React.Fragment key={c.id}>
-                {/* NODO DE BRECHA DE ENFRIAMIENTO (Aparece entre contratos) */}
+                {/* NODO DE BRECHA ENTRE CONTRATOS.
+                    Bajo el art. 159 N°4 inciso 5° cualquier interrupción hace que
+                    los servicios sean "discontinuos" (requisito 2), sin importar
+                    su duración: el dato es informativo, no un semáforo. */}
                 {brecha && (
                   <div className="position-relative mb-4 ps-4">
                     <div
@@ -273,19 +276,13 @@ export default function DetalleTrabajadorPage() {
                         transform: 'translateY(-50%)',
                       }}
                     ></div>
-                    <Badge
-                      bg={brecha.meses < 3 ? 'danger' : 'success'}
-                      className="text-white border"
-                    >
+                    <Badge bg="secondary" className="text-white border">
                       <i className="bi bi-clock-history me-1"></i>
                       Brecha: {brecha.meses} meses ({brecha.dias} días)
                     </Badge>
-                    {brecha.meses < 3 && (
-                      <span className="text-danger small ms-2 fw-semibold">
-                        <i className="bi bi-exclamation-circle me-1"></i> No cumple enfriamiento
-                        legal
-                      </span>
-                    )}
+                    <span className="text-muted small ms-2">
+                      Servicios discontinuos para el art. 159 N°4
+                    </span>
                   </div>
                 )}
 

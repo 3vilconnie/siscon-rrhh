@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { evaluarAlertaContinuidad } from '@/lib/utils/calculoAlertas';
 import {
   Card,
@@ -21,7 +22,7 @@ import { Trabajador, Usuario } from '@/types';
 
 interface ParametrosSistema {
   ventana_meses: number;
-  enfriamiento_meses: number;
+  meses_acumulados: number;
   minimo_contratos: number;
 }
 
@@ -39,10 +40,12 @@ export default function ConsolaAdministradorCompleta() {
   const [loading, setLoading] = useState(true);
   const [exportando, setExportando] = useState(false);
 
+  // Valores del art. 159 N°4 inciso 5°: 15 meses de ventana, 12 de servicios
+  // acumulados y "más de dos" contratos (⇒ 3).
   const [parametros, setParametros] = useState<ParametrosSistema>({
     ventana_meses: 15,
-    enfriamiento_meses: 3,
-    minimo_contratos: 2,
+    meses_acumulados: 12,
+    minimo_contratos: 3,
   });
   const [guardandoParametros, setGuardandoParametros] = useState(false);
 
@@ -112,7 +115,13 @@ export default function ConsolaAdministradorCompleta() {
       const resConfig = await fetch('/api/configuraciones');
       if (resConfig.ok) {
         const dataConfig = await resConfig.json();
-        if (dataConfig.ventana_meses) setParametros(dataConfig);
+        // Se fusiona con los valores por defecto: la tabla puede no tener
+        // todavía las claves nuevas (o conservar las del criterio anterior).
+        setParametros((prev) => ({
+          ventana_meses: Number(dataConfig.ventana_meses) || prev.ventana_meses,
+          meses_acumulados: Number(dataConfig.meses_acumulados) || prev.meses_acumulados,
+          minimo_contratos: Number(dataConfig.minimo_contratos) || prev.minimo_contratos,
+        }));
       }
 
       const resLogs = await fetch('/api/admin/auditoria');
@@ -394,18 +403,25 @@ export default function ConsolaAdministradorCompleta() {
                   min={1}
                   required
                 />
+                <Form.Text className="text-muted" style={{ fontSize: '0.72rem' }}>
+                  Art. 159 N°4: 15 meses corridos desde el primer contrato.
+                </Form.Text>
               </div>
               <div>
-                <Form.Label className="small fw-bold">Enfriamiento (Meses)</Form.Label>
+                <Form.Label className="small fw-bold">Mínimo de Contratos</Form.Label>
                 <Form.Control
                   type="number"
-                  value={parametros.enfriamiento_meses}
+                  value={parametros.minimo_contratos}
                   onChange={(e) =>
-                    setParametros({ ...parametros, enfriamiento_meses: Number(e.target.value) })
+                    setParametros({ ...parametros, minimo_contratos: Number(e.target.value) })
                   }
                   min={1}
                   required
                 />
+                <Form.Text className="text-muted" style={{ fontSize: '0.72rem' }}>
+                  «Más de dos contratos» ⇒ 3. Se exigen además 12 meses de servicios discontinuos
+                  dentro de la ventana.
+                </Form.Text>
               </div>
               <Button
                 type="submit"
@@ -500,6 +516,88 @@ export default function ConsolaAdministradorCompleta() {
                 </Button>
               </Col>
             </Form>
+          </Card>
+
+          <Card className="shadow-sm border-0 bg-white mb-4">
+            <Card.Body className="p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+              <div>
+                <h6 className="fw-bold text-dark mb-1">
+                  <i className="bi bi-file-earmark-code text-primary me-2"></i>
+                  Plantillas de Documentos
+                </h6>
+                <p className="text-muted small m-0">
+                  Reemplaza los formatos Word (contrato, finiquito, certificados...) sin editar
+                  archivos a mano. Valida los marcadores y permite probar antes de activar.
+                </p>
+              </div>
+              <Link
+                href="/dashboard/admin/plantillas"
+                className="btn btn-outline-primary fw-semibold"
+              >
+                Gestionar plantillas <i className="bi bi-arrow-right ms-1"></i>
+              </Link>
+            </Card.Body>
+          </Card>
+
+          <Card className="shadow-sm border-0 bg-white mb-4">
+            <Card.Body className="p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+              <div>
+                <h6 className="fw-bold text-dark mb-1">
+                  <i className="bi bi-upload text-primary me-2"></i>
+                  Importar datos personales
+                </h6>
+                <p className="text-muted small m-0">
+                  Completa domicilio, ciudad, fecha de nacimiento, estado civil, nacionalidad y
+                  género de los trabajadores desde una planilla Excel. Muestra una vista previa
+                  antes de escribir nada.
+                </p>
+              </div>
+              <Link
+                href="/dashboard/admin/importar"
+                className="btn btn-outline-primary fw-semibold"
+              >
+                Importar <i className="bi bi-arrow-right ms-1"></i>
+              </Link>
+            </Card.Body>
+          </Card>
+
+          <Card className="shadow-sm border-0 bg-white mb-4">
+            <Card.Body className="p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+              <div>
+                <h6 className="fw-bold text-dark mb-1">
+                  <i className="bi bi-archive text-primary me-2"></i>
+                  Historial de Lotes
+                </h6>
+                <p className="text-muted small m-0">
+                  Registro de cada generación masiva de contratos, anexos y finiquitos, con los
+                  montos y parámetros que se usaron. Información de auditoría.
+                </p>
+              </div>
+              <Link href="/dashboard/admin/lotes" className="btn btn-outline-primary fw-semibold">
+                Ver historial <i className="bi bi-arrow-right ms-1"></i>
+              </Link>
+            </Card.Body>
+          </Card>
+
+          <Card className="shadow-sm border-0 bg-white mb-4">
+            <Card.Body className="p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+              <div>
+                <h6 className="fw-bold text-dark mb-1">
+                  <i className="bi bi-calendar-event text-primary me-2"></i>
+                  Feriados Legales
+                </h6>
+                <p className="text-muted small m-0">
+                  Los feriados se calculan solos, pero las elecciones y los creados por ley puntual
+                  hay que cargarlos a mano. Se descuentan como días inhábiles en el finiquito.
+                </p>
+              </div>
+              <Link
+                href="/dashboard/admin/feriados"
+                className="btn btn-outline-primary fw-semibold"
+              >
+                Gestionar feriados <i className="bi bi-arrow-right ms-1"></i>
+              </Link>
+            </Card.Body>
           </Card>
 
           <Card className="shadow-sm border-0 bg-white overflow-hidden">

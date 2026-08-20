@@ -9,7 +9,7 @@
 
 import * as XLSX from 'xlsx-js-style';
 import PizZip from 'pizzip';
-import type { DatosFiniquito } from './finiquito';
+import { proyectarFeriado, type DatosFiniquito } from './finiquito';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -64,37 +64,41 @@ function f(formula: string, cache: number, z?: string, style?: any): any {
   return { t: 'n', f: formula, v: cache, ...(z ? { z } : {}), s: { font: FUENTE, ...style } };
 }
 
+/** Fila del encabezado del primer calendario; cada calendario ocupa 9 filas. */
+const FILA_CAL_INICIAL = 30;
+const FILAS_POR_CALENDARIO = 9;
+/** Semanas dibujadas por calendario (fijo, para que las filas sean predecibles). */
+const SEMANAS_POR_CALENDARIO = 6;
+
 /**
- * Proyecta el feriado a partir del día siguiente al término y devuelve qué
- * fechas son días hábiles (amarillo) y cuáles inhábiles/fin de semana (azul).
- * Es la misma lógica que estima los días inhábiles en `lib/finiquito.ts`.
+ * Meses que hay que dibujar: desde el mes del término hasta el mes del último
+ * día proyectado. Normalmente son 1 o 2 — el feriado casi siempre cruza al mes
+ * siguiente, y sin ese segundo calendario los días coloreados no se ven.
  */
-function proyectarFeriado(
+function mesesADibujar(
   terminoISO: string,
-  diasHabiles: number,
-): { habiles: Set<string>; inhabiles: Set<string> } {
-  const habiles = new Set<string>();
-  const inhabiles = new Set<string>();
-  const objetivo = Math.round(diasHabiles);
-  if (objetivo <= 0) return { habiles, inhabiles };
+  fechas: string[],
+): { anio: number; mes: number }[] {
+  const [y, m] = terminoISO.split('-').map(Number);
+  const inicio = { anio: y, mes: m - 1 }; // mes 0-based
 
-  const [y, m, d] = terminoISO.split('-').map(Number);
-  const cursor = new Date(Date.UTC(y, m - 1, d));
-  cursor.setUTCDate(cursor.getUTCDate() + 1);
+  const ultima = fechas.length > 0 ? fechas[fechas.length - 1] : terminoISO;
+  const [uy, um] = ultima.split('-').map(Number);
+  const fin = { anio: uy, mes: um - 1 };
 
-  let contados = 0;
-  for (let guardia = 0; guardia < 400 && contados < objetivo; guardia++) {
-    const dow = cursor.getUTCDay();
-    const iso = isoDeUTC(cursor);
-    if (dow === 0 || dow === 6) {
-      if (contados > 0) inhabiles.add(iso);
-    } else {
-      habiles.add(iso);
-      contados++;
+  const meses: { anio: number; mes: number }[] = [];
+  const cursor = { ...inicio };
+  // Cota de seguridad: un feriado proporcional nunca abarca tantos meses.
+  for (let i = 0; i < 12; i++) {
+    meses.push({ ...cursor });
+    if (cursor.anio === fin.anio && cursor.mes === fin.mes) break;
+    cursor.mes++;
+    if (cursor.mes > 11) {
+      cursor.mes = 0;
+      cursor.anio++;
     }
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
-  return { habiles, inhabiles };
+  return meses;
 }
 
 /**
@@ -165,27 +169,50 @@ export function construirHojaCalculo(d: DatosFiniquito): XLSX.WorkSheet {
   set('B25', t('', { border: BORDE }));
   set('C25', f('SUM(C23:C24)', habiles, FMT_DEC2, { border: BORDE, alignment: { horizontal: 'center' } }));
 
-  // Proyección del feriado (calendario coloreado).
-  const proyeccion = proyectarFeriado(d.contrato.fecha_termino, fin.dias_habiles);
-  agregarCalendario(set, d.contrato.fecha_termino, proyeccion);
+  // Proyección del feriado. Se dibuja un calendario por cada mes que abarca,
+  // porque el feriado casi siempre cruza al mes siguiente y con un solo
+  // calendario los días proyectados quedarían fuera de la vista.
+  const proyeccion = proyectarFeriado(
+    d.contrato.fecha_termino,
+    fin.dias_habiles,
+    new Set(fin.feriados ?? []),
+  );
+  const setHabiles = new Set(proyeccion.habiles);
+  const setInhabiles = new Set(proyeccion.inhabiles);
+  const todasLasFechas = [...proyeccion.habiles, ...proyeccion.inhabiles].sort();
+  const meses = mesesADibujar(d.contrato.fecha_termino, todasLasFechas);
 
-  set('A38', t('Total día hábiles feriado ', { font: FUENTE_B }));
-  set('B38', f('C25', habiles, FMT_DEC2));
-  set('C38', t('(color amarillo)'));
-  set('A39', t('total días inhábiles feriado '));
-  set('B39', n(fin.dias_inhabiles));
-  set('C39', t('(color azul)'));
-  set('A40', t('total días feriado a pagar', { font: FUENTE_B }));
-  set('B40', f('SUM(B38:B39)', feriadoAPagar, FMT_DEC2, { font: FUENTE_B }));
+  meses.forEach(({ anio, mes }, i) => {
+    const filaEncabezado = FILA_CAL_INICIAL + i * FILAS_POR_CALENDARIO;
+    const titulo =
+      i === 0
+        ? `Proyección Feriado: ${cap(MESES_ES[mes])} ${anio}`
+        : `Mes Siguiente: ${cap(MESES_ES[mes])} ${anio}`;
+    agregarCalendario(set, filaEncabezado, anio, mes, titulo, setHabiles, setInhabiles);
+  });
 
-  set('A43', t('Total días feriado legal', { font: FUENTE_B }));
-  set('B43', f('ROUND(B40,2)', fin.fp, FMT_DEC2, { font: FUENTE_B }));
-  set('A44', t('Valor sueldo por día'));
-  set('B44', f('B16', fin.valor_dia, FMT_PESOS));
-  set('A45', t('Total Finiquito a pagar', { font: FUENTE_B }));
-  set('B45', f('B44*B43', fin.total, FMT_PESOS, { font: FUENTE_B }));
+  // El resumen arranca dos filas debajo de la última semana dibujada.
+  const ultimaFilaCal =
+    FILA_CAL_INICIAL + (meses.length - 1) * FILAS_POR_CALENDARIO + SEMANAS_POR_CALENDARIO;
+  const r = ultimaFilaCal + 2;
 
-  ws['!ref'] = 'A1:M45';
+  set(`A${r}`, t('Total día hábiles feriado ', { font: FUENTE_B }));
+  set(`B${r}`, f('C25', habiles, FMT_DEC2));
+  set(`C${r}`, t('(color amarillo)'));
+  set(`A${r + 1}`, t('total días inhábiles feriado '));
+  set(`B${r + 1}`, n(fin.dias_inhabiles));
+  set(`C${r + 1}`, t('(color azul)'));
+  set(`A${r + 2}`, t('total días feriado a pagar', { font: FUENTE_B }));
+  set(`B${r + 2}`, f(`SUM(B${r}:B${r + 1})`, feriadoAPagar, FMT_DEC2, { font: FUENTE_B }));
+
+  set(`A${r + 5}`, t('Total días feriado legal', { font: FUENTE_B }));
+  set(`B${r + 5}`, f(`ROUND(B${r + 2},2)`, fin.fp, FMT_DEC2, { font: FUENTE_B }));
+  set(`A${r + 6}`, t('Valor sueldo por día'));
+  set(`B${r + 6}`, f('B16', fin.valor_dia, FMT_PESOS));
+  set(`A${r + 7}`, t('Total Finiquito a pagar', { font: FUENTE_B }));
+  set(`B${r + 7}`, f(`B${r + 6}*B${r + 5}`, fin.total, FMT_PESOS, { font: FUENTE_B }));
+
+  ws['!ref'] = `A1:M${r + 7}`;
   // A: etiquetas; B: valores / Lunes; C-H: resto del calendario (caben los 7 días).
   ws['!cols'] = [
     { wch: 28.57 },
@@ -200,47 +227,61 @@ export function construirHojaCalculo(d: DatosFiniquito): XLSX.WorkSheet {
   return ws;
 }
 
-/** Dibuja el calendario del mes siguiente al término (filas 30-36), coloreado. */
+/**
+ * Dibuja un calendario mensual completo (6 semanas, de lunes a domingo)
+ * empezando en el lunes de la semana que contiene el día 1 del mes, igual que
+ * la planilla original.
+ *
+ * Los días de meses vecinos que aparecen para completar la grilla se dibujan
+ * SIN color: cada fecha se colorea únicamente en el calendario de su propio
+ * mes, para no pintarla dos veces cuando dos calendarios se solapan.
+ */
 function agregarCalendario(
   set: (a: string, c: any) => void,
-  terminoISO: string,
-  proyeccion: { habiles: Set<string>; inhabiles: Set<string> },
+  filaEncabezado: number,
+  anio: number,
+  mesIdx: number,
+  titulo: string,
+  habiles: Set<string>,
+  inhabiles: Set<string>,
 ) {
-  const [y, m] = terminoISO.split('-').map(Number); // m es 1-based
-  const primero = new Date(Date.UTC(y, m, 1)); // primer día del mes siguiente
-  const anio = primero.getUTCFullYear();
-  const mesIdx = primero.getUTCMonth();
-
-  set('A30', t(`Proyección Feriado: ${cap(MESES_ES[mesIdx])} ${anio}`, { font: FUENTE_B }));
+  set(`A${filaEncabezado}`, t(titulo, { font: FUENTE_B }));
   const cabeceras = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   const colsCal = ['B', 'C', 'D', 'E', 'F', 'G', 'H'];
   cabeceras.forEach((h, i) =>
-    set(`${colsCal[i]}30`, t(h, { font: FUENTE_B, alignment: CENTRO, border: BORDE })),
+    set(`${colsCal[i]}${filaEncabezado}`, t(h, { font: FUENTE_B, alignment: CENTRO, border: BORDE })),
   );
 
-  const diasEnMes = new Date(Date.UTC(anio, mesIdx + 1, 0)).getUTCDate();
-  let fila = 31;
-  for (let dia = 1; dia <= diasEnMes; dia++) {
-    const fecha = new Date(Date.UTC(anio, mesIdx, dia));
-    const dow = fecha.getUTCDay(); // 0=domingo
-    const colIdx = (dow + 6) % 7; // 0=lunes … 6=domingo
-    const iso = isoDeUTC(fecha);
-    const serial = (Date.UTC(anio, mesIdx, dia) - Date.UTC(1899, 11, 30)) / 86400000;
-    let relleno: any = undefined;
-    if (proyeccion.habiles.has(iso)) relleno = AMARILLO;
-    else if (proyeccion.inhabiles.has(iso)) relleno = AZUL;
-    set(`${colsCal[colIdx]}${fila}`, {
-      t: 'n',
-      v: serial,
-      z: 'd',
-      s: {
-        font: FUENTE,
-        border: BORDE,
-        alignment: { horizontal: 'center' },
-        ...(relleno ? { fill: relleno } : {}),
-      },
-    });
-    if (colIdx === 6) fila++; // salto de semana tras el domingo
+  // Lunes de la semana que contiene el día 1 del mes.
+  const primero = new Date(Date.UTC(anio, mesIdx, 1));
+  const desplazamiento = (primero.getUTCDay() + 6) % 7; // 0 = ya es lunes
+  const cursor = new Date(Date.UTC(anio, mesIdx, 1 - desplazamiento));
+
+  for (let semana = 0; semana < SEMANAS_POR_CALENDARIO; semana++) {
+    for (let col = 0; col < 7; col++) {
+      const iso = isoDeUTC(cursor);
+      const esDelMes = cursor.getUTCMonth() === mesIdx && cursor.getUTCFullYear() === anio;
+      const serial = (cursor.getTime() - Date.UTC(1899, 11, 30)) / 86400000;
+
+      let relleno: any = undefined;
+      if (esDelMes) {
+        if (habiles.has(iso)) relleno = AMARILLO;
+        else if (inhabiles.has(iso)) relleno = AZUL;
+      }
+
+      set(`${colsCal[col]}${filaEncabezado + 1 + semana}`, {
+        t: 'n',
+        v: serial,
+        z: 'd',
+        s: {
+          font: FUENTE,
+          border: BORDE,
+          alignment: { horizontal: 'center' },
+          ...(relleno ? { fill: relleno } : {}),
+        },
+      });
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
   }
 }
 

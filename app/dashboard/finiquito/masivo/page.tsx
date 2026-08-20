@@ -20,6 +20,14 @@ import {
   type DatosFiniquito,
 } from '@/lib/finiquito';
 import { descargarZipCalculos } from '@/lib/finiquitoCalculoXlsx';
+import {
+  construirSetFeriados,
+  REGIONES_FERIADO,
+  type FeriadoManual,
+  type RegionFeriado,
+} from '@/lib/feriados';
+import { cargarFeriadosManuales } from '@/lib/feriadosRepo';
+import { registrarLote } from '@/lib/lotesRepo';
 
 interface Seleccionado {
   rut: number;
@@ -46,7 +54,11 @@ function contratoPorDefecto(t: Trabajador): Contrato | null {
 }
 
 /** Crea una fila de selección sembrando cálculo desde un contrato. */
-function filaDesdeContrato(t: Trabajador, c: Contrato | null): Seleccionado {
+function filaDesdeContrato(
+  t: Trabajador,
+  c: Contrato | null,
+  feriados: Set<string> = new Set(),
+): Seleccionado {
   const fechaInicio = c?.fecha_inicio ?? '';
   const fechaTermino = c?.fecha_termino ?? '';
   const sueldoImponible = c?.sueldo_base ?? 0;
@@ -58,7 +70,7 @@ function filaDesdeContrato(t: Trabajador, c: Contrato | null): Seleccionado {
       sueldoImponible,
       diasInhabiles: 0,
     });
-    diasInhabiles = estimarDiasInhabiles(fechaTermino, diasHabiles);
+    diasInhabiles = estimarDiasInhabiles(fechaTermino, diasHabiles, feriados);
   }
   return {
     rut: t.rut,
@@ -80,6 +92,15 @@ export default function FiniquitoMasivoPage() {
   const [causalId, setCausalId] = useState(CAUSAL_FINIQUITO_DEFAULT_ID);
   const [ciudad, setCiudad] = useState('Arica');
   const [redactor, setRedactor] = useState('crh');
+
+  // Feriados legales del lote (ver lib/feriados.ts). La región define si se
+  // descuentan además los feriados regionales.
+  const [region, setRegion] = useState<RegionFeriado>('arica');
+  const [feriadosManuales, setFeriadosManuales] = useState<FeriadoManual[]>([]);
+
+  useEffect(() => {
+    cargarFeriadosManuales().then(setFeriadosManuales);
+  }, []);
   const [firmante, setFirmante] = useState<FirmanteFiniquito>({ ...FIRMANTE_FINIQUITO_DEFAULT });
   const setFirmanteCampo = (campo: keyof FirmanteFiniquito, valor: string) =>
     setFirmante((prev) => ({ ...prev, [campo]: valor }));
@@ -113,10 +134,26 @@ export default function FiniquitoMasivoPage() {
 
   const yaAgregado = (rut: number) => seleccionados.some((s) => s.rut === rut);
 
+  /** Feriados del lote; cubre los años que puedan abarcar los términos seleccionados. */
+  const feriados = useMemo(() => {
+    const anios = new Set<number>();
+    const actual = new Date().getUTCFullYear();
+    anios.add(actual);
+    anios.add(actual + 1);
+    for (const s of seleccionados) {
+      if (s.fechaTermino) {
+        const a = Number(s.fechaTermino.slice(0, 4));
+        anios.add(a);
+        anios.add(a + 1);
+      }
+    }
+    return construirSetFeriados([...anios], region, feriadosManuales);
+  }, [seleccionados, region, feriadosManuales]);
+
   const agregar = (t: Trabajador, contrato?: Contrato | null) => {
     if (yaAgregado(t.rut)) return;
     const c = contrato ?? contratoPorDefecto(t);
-    setSeleccionados((prev) => [...prev, filaDesdeContrato(t, c)]);
+    setSeleccionados((prev) => [...prev, filaDesdeContrato(t, c, feriados)]);
   };
 
   const quitar = (rut: number) => setSeleccionados((prev) => prev.filter((s) => s.rut !== rut));
@@ -131,7 +168,7 @@ export default function FiniquitoMasivoPage() {
       prev.map((s) => {
         if (s.rut !== rut) return s;
         const c = s.trabajador.contratos?.find((x) => x.id === contratoId) ?? null;
-        return filaDesdeContrato(s.trabajador, c);
+        return filaDesdeContrato(s.trabajador, c, feriados);
       }),
     );
   };
@@ -212,6 +249,7 @@ export default function FiniquitoMasivoPage() {
         programa,
         firmante,
         diasInhabiles: s.diasInhabiles,
+        feriados,
       }).datos;
     });
 
@@ -255,6 +293,45 @@ export default function FiniquitoMasivoPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+
+      // Registro del lote: automático y best-effort. Hasta ahora los
+      // finiquitos no dejaban ningún rastro de a quién ni por cuánto.
+      // Se guardan los valores CALCULADOS, no una referencia: si mañana
+      // cambia la fórmula, el lote debe seguir mostrando lo que se pagó.
+      await registrarLote({
+        tipo: 'finiquito',
+        formato,
+        parametros: {
+          programaId,
+          causalId,
+          articulo: causal.articulo,
+          terminos: causal.terminos,
+          ciudad,
+          redactor,
+          region,
+          firmante: firmante.nombre,
+          totalLote,
+        },
+        items: seleccionados.map((s) => {
+          const c = calculoPorRut.get(s.rut);
+          return {
+            trabajador_rut: s.rut,
+            nombre_completo:
+              `${s.trabajador.nombres} ${s.trabajador.primer_apellido} ${s.trabajador.segundo_apellido ?? ''}`
+                .trim()
+                .toUpperCase(),
+            fecha_inicio: s.fechaInicio || null,
+            fecha_termino: s.fechaTermino || null,
+            monto: c?.total ?? 0,
+            detalle: {
+              sueldoImponible: s.sueldoImponible,
+              diasInhabiles: s.diasInhabiles,
+              fp: c?.fp ?? 0,
+            },
+          };
+        }),
+      });
+
       toast.success('Documento generado.', { id: toastId });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al generar.', {
@@ -334,6 +411,25 @@ export default function FiniquitoMasivoPage() {
                 <Col xs={6}>
                   <Form.Label className="small fw-bold text-secondary">Iniciales</Form.Label>
                   <Form.Control value={redactor} onChange={(e) => setRedactor(e.target.value)} />
+                </Col>
+                <Col xs={12}>
+                  <Form.Label className="small fw-bold text-secondary">
+                    Región (feriados regionales)
+                  </Form.Label>
+                  <Form.Select
+                    value={region}
+                    onChange={(e) => setRegion(e.target.value as RegionFeriado)}
+                  >
+                    {REGIONES_FERIADO.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.etiqueta}
+                      </option>
+                    ))}
+                  </Form.Select>
+                  <Form.Text className="text-muted">
+                    Los días inhábiles ya cargados no se recalculan al cambiarla; vuelve a
+                    seleccionar el contrato de la fila si necesitas actualizarlos.
+                  </Form.Text>
                 </Col>
               </Row>
             </Card.Body>

@@ -10,6 +10,7 @@ import crypto from 'node:crypto';
 import PizZip from 'pizzip';
 import type { DatosContrato } from '@/lib/contrato';
 import { mergeDocxBuffers } from '@/lib/mergeDocx';
+import { resolverRutaPlantilla } from '@/lib/plantillaArchivo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,8 @@ export const dynamic = 'force-dynamic';
 interface CuerpoPeticion {
   formato: 'pdf' | 'docx';
   documentos: DatosContrato[];
+  /** 'anexo' usa la plantilla de Anexo de Ampliación en vez del contrato. */
+  tipo?: 'contrato' | 'anexo';
 }
 
 const CONTENT_TYPES = {
@@ -24,7 +27,8 @@ const CONTENT_TYPES = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 } as const;
 
-const ARCHIVO_PLANTILLA = 'contrato-trabajo.docx';
+const PLANTILLA_CONTRATO = 'contrato-trabajo.docx';
+const PLANTILLA_ANEXO = 'anexo-ampliacion.docx';
 
 /** Renumera los ids de dibujo (el logo se repite en cada página). */
 function renumerarIdsDibujos(buf: Buffer): Buffer {
@@ -46,7 +50,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Cuerpo de la petición inválido.' }, { status: 400 });
   }
 
-  const { formato, documentos } = cuerpo;
+  const { formato, documentos, tipo } = cuerpo;
   if (!Array.isArray(documentos) || documentos.length === 0) {
     return NextResponse.json({ error: 'Agrega al menos un contrato.' }, { status: 400 });
   }
@@ -54,13 +58,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Formato debe ser "pdf" o "docx".' }, { status: 400 });
   }
 
-  const rutaPlantilla = path.join(process.cwd(), 'plantillas', ARCHIVO_PLANTILLA);
-  if (!fs.existsSync(rutaPlantilla)) {
-    return NextResponse.json(
-      { error: `No se encontró la plantilla "${ARCHIVO_PLANTILLA}".` },
-      { status: 404 },
-    );
-  }
+  const esAnexo = tipo === 'anexo';
+  const ARCHIVO_PLANTILLA = esAnexo ? PLANTILLA_ANEXO : PLANTILLA_CONTRATO;
+  const { ruta: rutaPlantilla, limpiar } = await resolverRutaPlantilla(ARCHIVO_PLANTILLA);
 
   const opciones = { lang: 'es-cl', timezone: 'America/Santiago' };
   let tempPdfSrc: string | null = null;
@@ -93,7 +93,9 @@ export async function POST(request: Request) {
       });
     }
 
-    const nombreArchivo = `contratos_masivo_${documentos.length}.${formato}`;
+    const nombreArchivo = esAnexo
+      ? `anexos_ampliacion_${documentos.length}.${formato}`
+      : `contratos_masivo_${documentos.length}.${formato}`;
     return new NextResponse(new Uint8Array(salida), {
       status: 200,
       headers: {
@@ -106,15 +108,19 @@ export async function POST(request: Request) {
     const mensaje = error instanceof Error ? error.message : String(error);
     const faltaLibreOffice =
       formato === 'pdf' && /soffice|libreoffice|could not|ENOENT|convert/i.test(mensaje);
+    const faltaPlantilla = /ENOENT/.test(mensaje);
     return NextResponse.json(
       {
         error: faltaLibreOffice
           ? 'No se pudo convertir a PDF. Verifica que LibreOffice esté instalado en el servidor. El formato Word (.docx) no lo requiere.'
-          : `Error al generar los contratos: ${mensaje}`,
+          : faltaPlantilla
+            ? `No se encontró la plantilla "${ARCHIVO_PLANTILLA}".`
+            : `Error al generar los contratos: ${mensaje}`,
       },
-      { status: 500 },
+      { status: faltaPlantilla ? 404 : 500 },
     );
   } finally {
+    limpiar();
     if (tempPdfSrc && fs.existsSync(tempPdfSrc)) {
       try {
         fs.unlinkSync(tempPdfSrc);
